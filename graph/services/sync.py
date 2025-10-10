@@ -58,7 +58,6 @@ class GraphSyncService:
     # ------------------------------------------------------------------
     def _handle_memory_entry_saved(self, sender, instance: MemoryEntry, **kwargs: Any) -> None:
         metadata = {
-            "title": instance.title,
             "sensitivity": instance.sensitivity,
             "entry_type": instance.entry_type,
         }
