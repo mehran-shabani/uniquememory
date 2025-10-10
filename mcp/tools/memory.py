@@ -53,15 +53,17 @@ def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     )
 
     allowed: List[HybridSearchResult] = [
-        result for result in raw_results if context.consent and context.consent.allows_sensitivity(result.sensitivity)
+        result for result in raw_results
+        if context.consent and context.consent.allows_sensitivity(result.sensitivity)
     ]
     allowed = allowed[:limit]
 
-    validator.ensure_permissions(
-        context,
-        action="memory:query",
-        sensitivities=[result.sensitivity for result in allowed],
-    )
+    if allowed:
+        validator.ensure_permissions(
+            context,
+            action="memory:query",
+            sensitivities=[result.sensitivity for result in allowed],
+        )
 
     return {
         "user_id": str(context.subject.pk),
