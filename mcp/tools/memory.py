@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable, List
+from collections.abc import Iterable
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
