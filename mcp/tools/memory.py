@@ -92,8 +92,8 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         raise PermissionDenied("entry payload must be an object.")
 
     entry_id = entry_payload.get("id")
-    sensitivity = entry_payload.get("sensitivity", MemoryEntry.SENSITIVITY_PUBLIC)
-    if sensitivity and sensitivity not in {choice for choice, _ in MemoryEntry.SENSITIVITY_CHOICES}:
+    requested_sensitivity = entry_payload.get("sensitivity")
+    if requested_sensitivity and requested_sensitivity not in {choice for choice, _ in MemoryEntry.SENSITIVITY_CHOICES}:
         raise PermissionDenied("Invalid sensitivity value.")
 
     entry_type = entry_payload.get("entry_type", MemoryEntry.TYPE_NOTE)
@@ -101,6 +101,7 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         raise PermissionDenied("Invalid entry_type value.")
 
     if entry_id is None:
+        sensitivity = requested_sensitivity or MemoryEntry.SENSITIVITY_PUBLIC
         validator.validate(
             bearer_token,
             action="memory:create",
@@ -132,17 +133,28 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         except MemoryEntry.DoesNotExist as exc:
             raise PermissionDenied("Memory entry not found.") from exc
 
-        validator.validate(
+        context = validator.validate(
             bearer_token,
             action="memory:update",
             required_scopes=[SCOPE_MEMORY_WRITE],
-            sensitivity=entry_payload.get("sensitivity", entry.sensitivity),
+            sensitivity=entry.sensitivity,
         )
+
+        if requested_sensitivity and requested_sensitivity != entry.sensitivity:
+            validator.ensure_permissions(
+                context,
+                action="memory:update",
+                sensitivity=requested_sensitivity,
+            )
 
         if entry.version != expected_version:
             raise PermissionDenied("Version conflict detected.")
 
-        updates = {key: value for key, value in entry_payload.items() if key in {"title", "content", "sensitivity", "entry_type"}}
+        updates = {
+            key: value
+            for key, value in entry_payload.items()
+            if key in {"title", "content", "sensitivity", "entry_type"}
+        }
         for field, value in updates.items():
             setattr(entry, field, value)
         entry.version = expected_version + 1
