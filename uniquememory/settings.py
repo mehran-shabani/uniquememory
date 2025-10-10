@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "audit",
     "consents",
     "portal",
+    "graph",
 ]
 
 MIDDLEWARE = [
