@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "consents",
     "portal",
     "graph",
+    "mcp",
 ]
 
 MIDDLEWARE = [
