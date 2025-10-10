@@ -71,7 +71,7 @@ class GraphRelatedView(View):
         limit = int(limit_param)
         if limit <= 0:
             raise ValueError
-        return limit
+        return min(limit, 100)
 
     def _parse_candidates(self, params: QueryDict) -> List[str]:
         values: List[str] = []
