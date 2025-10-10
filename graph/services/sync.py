@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models.signals import post_delete, post_save
 
 from consents.models import Consent
@@ -56,56 +56,72 @@ class GraphSyncService:
     # ------------------------------------------------------------------
     # Signal handlers
     # ------------------------------------------------------------------
-    def _handle_memory_entry_saved(self, sender, instance: MemoryEntry, **kwargs: Any) -> None:
-        metadata = {
-            "sensitivity": instance.sensitivity,
-            "entry_type": instance.entry_type,
-        }
-        node = self._upsert_node(
-            node_type=self.memory_node_type,
-            reference_id=str(instance.pk),
-            metadata=metadata,
-        )
-        self._link_memory_entry(node=node, entry=instance)
+    def _handle_memory_entry_saved(self, _sender, instance: MemoryEntry, **_kwargs: Any) -> None:
+        def sync() -> None:
+            metadata = {
+                "sensitivity": instance.sensitivity,
+                "entry_type": instance.entry_type,
+            }
+            node = self._upsert_node(
+                node_type=self.memory_node_type,
+                reference_id=str(instance.pk),
+                metadata=metadata,
+            )
+            self._link_memory_entry(node=node, entry=instance)
 
-    def _handle_memory_entry_deleted(self, sender, instance: MemoryEntry, **kwargs: Any) -> None:
-        GraphNode.objects.filter(
-            node_type=self.memory_node_type,
-            reference_id=str(instance.pk),
-        ).delete()
+        self._on_commit(sync)
 
-    def _handle_consent_saved(self, sender, instance: Consent, **kwargs: Any) -> None:
-        metadata = {
-            "status": instance.status,
-            "scopes": list(instance.scopes or []),
-            "sensitivity_levels": list(instance.sensitivity_levels or []),
-        }
-        consent_node = self._upsert_node(
-            node_type=self.consent_node_type,
-            reference_id=str(instance.pk),
-            metadata=metadata,
-        )
-        user_node = self._upsert_node(
-            node_type=self.user_node_type,
-            reference_id=str(instance.user_id),
-            metadata={"email": instance.user.email},
-        )
-        agent_node = self._upsert_node(
-            node_type=self.agent_node_type,
-            reference_id=instance.agent_identifier,
-            metadata={"identifier": instance.agent_identifier},
-        )
-        self._ensure_edge(user_node, consent_node, "grants", weight=1.0)
-        self._ensure_edge(consent_node, user_node, "granted_by", weight=1.0)
-        self._ensure_edge(consent_node, agent_node, "granted_to", weight=0.8)
-        self._ensure_edge(agent_node, consent_node, "receives", weight=0.8)
-        self._link_consent_to_sensitivity(consent_node, instance.sensitivity_levels)
+    def _handle_memory_entry_deleted(self, _sender, instance: MemoryEntry, **_kwargs: Any) -> None:
+        def sync() -> None:
+            GraphNode.objects.filter(
+                node_type=self.memory_node_type,
+                reference_id=str(instance.pk),
+            ).delete()
 
-    def _handle_consent_deleted(self, sender, instance: Consent, **kwargs: Any) -> None:
-        GraphNode.objects.filter(
-            node_type=self.consent_node_type,
-            reference_id=str(instance.pk),
-        ).delete()
+        self._on_commit(sync)
+
+    def _handle_consent_saved(self, _sender, instance: Consent, **_kwargs: Any) -> None:
+        def sync() -> None:
+            metadata = {
+                "status": instance.status,
+                "scopes": list(instance.scopes or []),
+                "sensitivity_levels": list(instance.sensitivity_levels or []),
+            }
+            consent_node = self._upsert_node(
+                node_type=self.consent_node_type,
+                reference_id=str(instance.pk),
+                metadata=metadata,
+            )
+            user_node = self._upsert_node(
+                node_type=self.user_node_type,
+                reference_id=str(instance.user_id),
+                metadata={"email": instance.user.email},
+            )
+            agent_node = self._upsert_node(
+                node_type=self.agent_node_type,
+                reference_id=instance.agent_identifier,
+                metadata={"identifier": instance.agent_identifier},
+            )
+
+            if instance.is_active:
+                self._ensure_edge(user_node, consent_node, "grants", weight=1.0)
+                self._ensure_edge(consent_node, user_node, "granted_by", weight=1.0)
+                self._ensure_edge(consent_node, agent_node, "granted_to", weight=0.8)
+                self._ensure_edge(agent_node, consent_node, "receives", weight=0.8)
+                self._link_consent_to_sensitivity(consent_node, instance.sensitivity_levels)
+            else:
+                self._clear_consent_edges(consent_node, user_node, agent_node)
+
+        self._on_commit(sync)
+
+    def _handle_consent_deleted(self, _sender, instance: Consent, **_kwargs: Any) -> None:
+        def sync() -> None:
+            GraphNode.objects.filter(
+                node_type=self.consent_node_type,
+                reference_id=str(instance.pk),
+            ).delete()
+
+        self._on_commit(sync)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -132,12 +148,18 @@ class GraphSyncService:
         metadata: dict[str, Any] | None = None,
     ) -> GraphEdge:
         metadata = metadata or {}
-        edge, created = GraphEdge.objects.get_or_create(
-            source=source,
-            target=target,
-            relation_type=relation_type,
-            defaults={"weight": weight, "metadata": metadata},
-        )
+        try:
+            edge, created = GraphEdge.objects.get_or_create(
+                source=source,
+                target=target,
+                relation_type=relation_type,
+                defaults={"weight": weight, "metadata": metadata},
+            )
+        except IntegrityError:
+            edge = GraphEdge.objects.get(
+                source=source, target=target, relation_type=relation_type
+            )
+            created = False
         if not created:
             updates = {}
             if edge.weight != weight:
@@ -197,10 +219,48 @@ class GraphSyncService:
             existing_permits_by_level.pop(level, None)
             existing_permitted_by_by_level.pop(level, None)
         # Remove stale sensitivity edges that are no longer granted
-        for stale in existing_permits_by_level.values():
-            GraphEdge.objects.filter(pk=stale.pk).delete()
-        for stale in existing_permitted_by_by_level.values():
-            GraphEdge.objects.filter(pk=stale.pk).delete()
+        if existing_permits_by_level:
+            stale_target_ids = {edge.target_id for edge in existing_permits_by_level.values()}
+            GraphEdge.objects.filter(
+                source=consent_node,
+                relation_type="permits_sensitivity",
+                target_id__in=stale_target_ids,
+            ).delete()
+        if existing_permitted_by_by_level:
+            stale_source_ids = {edge.source_id for edge in existing_permitted_by_by_level.values()}
+            GraphEdge.objects.filter(
+                source_id__in=stale_source_ids,
+                target=consent_node,
+                relation_type="permitted_by",
+            ).delete()
+
+    def _clear_consent_edges(
+        self,
+        consent_node: GraphNode,
+        user_node: GraphNode,
+        agent_node: GraphNode,
+    ) -> None:
+        GraphEdge.objects.filter(
+            source=user_node, target=consent_node, relation_type="grants"
+        ).delete()
+        GraphEdge.objects.filter(
+            source=consent_node, target=user_node, relation_type="granted_by"
+        ).delete()
+        GraphEdge.objects.filter(
+            source=consent_node, target=agent_node, relation_type="granted_to"
+        ).delete()
+        GraphEdge.objects.filter(
+            source=agent_node, target=consent_node, relation_type="receives"
+        ).delete()
+        GraphEdge.objects.filter(
+            source=consent_node, relation_type="permits_sensitivity"
+        ).delete()
+        GraphEdge.objects.filter(
+            target=consent_node, relation_type="permitted_by"
+        ).delete()
+
+    def _on_commit(self, func: Callable[[], None]) -> None:
+        transaction.on_commit(func)
 
 
 graph_sync_service = GraphSyncService()

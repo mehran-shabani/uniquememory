@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from collections import defaultdict, deque
-from typing import Any, Dict, Iterable, List, Tuple
+from collections import defaultdict
+from collections.abc import Iterable
+from heapq import heappop, heappush
+from typing import Any, ClassVar
 
 from django.http import (HttpRequest, HttpResponseBadRequest, JsonResponse,
                          QueryDict)
+from django.db.models import Q
 from django.views import View
 
 from graph.models import GraphEdge, GraphNode
@@ -14,9 +17,9 @@ class GraphRelatedView(View):
     """Return nodes related to a given anchor node ranked by graph proximity."""
 
     http_method_names = ["get"]
-    max_depth: int = 4
+    max_depth: ClassVar[int] = 4
 
-    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> JsonResponse:
+    def get(self, request: HttpRequest, *_: Any, **__: Any) -> JsonResponse:
         node_type = request.GET.get("node_type")
         reference_id = request.GET.get("reference_id")
         if not node_type or not reference_id:
@@ -48,12 +51,12 @@ class GraphRelatedView(View):
         if not candidates:
             return JsonResponse({"count": 0, "results": []}, status=200)
 
-        adjacency = self._build_adjacency()
+        adjacency = self._build_adjacency(anchor, candidates)
         ranked = self._rank_candidates(anchor, candidates, adjacency)
         payload = {
             "node": {
                 "id": anchor.id,
-                "type": anchor.node_type,
+                "node_type": anchor.node_type,
                 "reference_id": anchor.reference_id,
             },
             "count": min(limit, len(ranked)),
@@ -73,8 +76,8 @@ class GraphRelatedView(View):
             raise ValueError
         return min(limit, 100)
 
-    def _parse_candidates(self, params: QueryDict) -> List[str]:
-        values: List[str] = []
+    def _parse_candidates(self, params: QueryDict) -> list[str]:
+        values: list[str] = []
         if "candidate" in params:
             values.extend(params.getlist("candidate"))
         candidates_param = params.get("candidates")
@@ -91,12 +94,39 @@ class GraphRelatedView(View):
     # ------------------------------------------------------------------
     # Ranking helpers
     # ------------------------------------------------------------------
-    def _build_adjacency(self) -> Dict[int, List[Tuple[int, float]]]:
-        adjacency: Dict[int, List[Tuple[int, float]]] = defaultdict(list)
-        edges = GraphEdge.objects.all().values_list("source_id", "target_id", "weight")
-        for source_id, target_id, weight in edges:
-            adjacency[source_id].append((target_id, float(weight)))
-            adjacency[target_id].append((source_id, float(weight)))
+    def _build_adjacency(
+        self, anchor: GraphNode, _candidates: Iterable[GraphNode]
+    ) -> dict[int, list[tuple[int, float]]]:
+        adjacency: dict[int, list[tuple[int, float]]] = defaultdict(list)
+        frontier: set[int] = {anchor.id}
+        visited: set[int] = set()
+        seen_edges: set[tuple[int, int]] = set()
+
+        depth = 0
+        while frontier and depth < self.max_depth:
+            edges = GraphEdge.objects.filter(
+                Q(source_id__in=frontier) | Q(target_id__in=frontier)
+            ).values_list("source_id", "target_id", "weight")
+
+            next_frontier: set[int] = set()
+            for source_id, target_id, weight in edges:
+                weight_value = float(weight)
+                if (source_id, target_id) not in seen_edges:
+                    adjacency[source_id].append((target_id, weight_value))
+                    seen_edges.add((source_id, target_id))
+                if (target_id, source_id) not in seen_edges:
+                    adjacency[target_id].append((source_id, weight_value))
+                    seen_edges.add((target_id, source_id))
+
+                if target_id not in visited and target_id not in frontier:
+                    next_frontier.add(target_id)
+                if source_id not in visited and source_id not in frontier:
+                    next_frontier.add(source_id)
+
+            visited.update(frontier)
+            depth += 1
+            frontier = next_frontier - visited
+
         return adjacency
 
     def _rank_candidates(
@@ -104,17 +134,16 @@ class GraphRelatedView(View):
         anchor: GraphNode,
         candidates: Iterable[GraphNode],
         adjacency: Dict[int, List[Tuple[int, float]]],
-    ) -> List[Dict[str, Any]]:
-        results: List[Dict[str, Any]] = []
+    ) -> list[dict[str, Any]]:
+        results: list[dict[str, Any]] = []
         for candidate in candidates:
             score = self._compute_closeness(anchor_id=anchor.id, candidate_id=candidate.id, adjacency=adjacency)
             results.append(
                 {
-                    "node_id": candidate.id,
+                    "id": candidate.id,
                     "reference_id": candidate.reference_id,
                     "node_type": candidate.node_type,
                     "score": round(score, 6),
-                    "metadata": candidate.metadata,
                 }
             )
         results.sort(key=lambda item: item["score"], reverse=True)
@@ -125,28 +154,36 @@ class GraphRelatedView(View):
         *,
         anchor_id: int,
         candidate_id: int,
-        adjacency: Dict[int, List[Tuple[int, float]]],
+        adjacency: dict[int, list[tuple[int, float]]],
     ) -> float:
         if anchor_id == candidate_id:
             return 1.0
-        visited = {anchor_id}
-        queue: deque[Tuple[int, int, float]] = deque([(anchor_id, 0, 1.0)])
+        best_paths: dict[int, float] = {anchor_id: 1.0}
+        heap: list[tuple[float, int, int]] = [(-1.0, anchor_id, 0)]
         best_score = 0.0
-        while queue:
-            node_id, depth, weight_product = queue.popleft()
+
+        while heap:
+            neg_weight, node_id, depth = heappop(heap)
+            weight_product = -neg_weight
             if depth >= self.max_depth:
                 continue
+
             for neighbor_id, edge_weight in adjacency.get(node_id, []):
                 next_depth = depth + 1
+                if next_depth > self.max_depth:
+                    continue
+
                 next_weight = weight_product * edge_weight
                 if neighbor_id == candidate_id:
                     distance_score = 1.0 / (next_depth + 1)
                     best_score = max(best_score, distance_score * next_weight)
+
+                if next_weight <= best_paths.get(neighbor_id, 0.0):
                     continue
-                if neighbor_id in visited:
-                    continue
-                visited.add(neighbor_id)
-                queue.append((neighbor_id, next_depth, next_weight))
+
+                best_paths[neighbor_id] = next_weight
+                heappush(heap, (-next_weight, neighbor_id, next_depth))
+
         return best_score
 
 

@@ -46,12 +46,12 @@ class GraphRelatedBenchmarkTests(TestCase):
                 ],
             },
         )
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         payload = response.json()
-        self.assertEqual(payload["count"], 2)
+        assert payload["count"] == 2
         scores = {result["reference_id"]: result["score"] for result in payload["results"]}
         public_score = scores.get(str(self.entry_public.pk), 0.0)
         secret_score = scores.get(str(self.entry_secret.pk), 0.0)
-        self.assertGreater(public_score, secret_score)
+        assert public_score > secret_score
         # Simple benchmark: ensure the preferred entry has a meaningful score.
-        self.assertGreaterEqual(public_score, 0.05)
+        assert public_score >= 0.05
