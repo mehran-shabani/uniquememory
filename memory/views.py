@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import (HttpRequest, HttpResponse, HttpResponseBadRequest,
                          JsonResponse)
@@ -10,6 +11,9 @@ from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.generic import DetailView, ListView
+
+from accounts.models import User
+from policies.engine import PolicyEngine
 
 from .models import MemoryEntry
 
@@ -27,6 +31,39 @@ def _parse_if_match(request: HttpRequest) -> int | None:
         return int(header_value)
     except (TypeError, ValueError):
         return None
+
+
+policy_engine = PolicyEngine()
+
+
+def _extract_subject(request: HttpRequest) -> User:
+    subject_id = request.headers.get("X-Subject-ID")
+    if not subject_id:
+        raise PermissionDenied("Missing X-Subject-ID header.")
+    return get_object_or_404(User, pk=subject_id)
+
+
+def _extract_agent_identifier(request: HttpRequest) -> str:
+    agent_identifier = request.headers.get("X-Agent-ID")
+    if not agent_identifier:
+        raise PermissionDenied("Missing X-Agent-ID header.")
+    return agent_identifier
+
+
+def _enforce_query_permissions(request: HttpRequest, queryset) -> None:
+    subject = _extract_subject(request)
+    agent_identifier = _extract_agent_identifier(request)
+    sensitivities = queryset.values_list("sensitivity", flat=True).distinct()
+    policy_engine.enforce_multiple(
+        subject=subject,
+        agent_identifier=agent_identifier,
+        action="memory:list",
+        sensitivities=sensitivities,
+    )
+
+
+def _permission_denied_response(exception: PermissionDenied) -> HttpResponse:
+    return HttpResponse(str(exception), status=403)
 
 
 class MemoryEntryListView(ListView):
@@ -72,7 +109,7 @@ class MemoryEntryCollectionApiView(View):
 
     http_method_names = ["get", "post"]
 
-    def get(self, request: HttpRequest, *args, **kwargs) -> JsonResponse:
+    def get(self, request: HttpRequest, *args, **kwargs) -> JsonResponse | HttpResponse:
         sensitivity = request.GET.get("sensitivity")
         entry_type = request.GET.get("entry_type")
         queryset = MemoryEntry.objects.all().order_by("-updated_at", "title")
@@ -80,6 +117,10 @@ class MemoryEntryCollectionApiView(View):
             queryset = queryset.filter(sensitivity=sensitivity)
         if entry_type:
             queryset = queryset.filter(entry_type=entry_type)
+        try:
+            _enforce_query_permissions(request, queryset)
+        except PermissionDenied as exc:
+            return _permission_denied_response(exc)
         payload = [
             {
                 "id": entry.pk,
@@ -91,9 +132,9 @@ class MemoryEntryCollectionApiView(View):
             }
             for entry in queryset
         ]
-        return JsonResponse({"results": payload})
+        return JsonResponse({"count": len(payload), "results": payload})
 
-    def post(self, request: HttpRequest, *args, **kwargs) -> JsonResponse:
+    def post(self, request: HttpRequest, *args, **kwargs) -> JsonResponse | HttpResponse:
         try:
             data = json.loads(request.body.decode() or "{}")
         except json.JSONDecodeError:
@@ -110,6 +151,18 @@ class MemoryEntryCollectionApiView(View):
             return HttpResponseBadRequest("Invalid sensitivity value.")
         if entry_type and not _is_valid_choice(entry_type, MemoryEntry.TYPE_CHOICES):
             return HttpResponseBadRequest("Invalid entry_type value.")
+
+        try:
+            subject = _extract_subject(request)
+            agent_identifier = _extract_agent_identifier(request)
+            policy_engine.enforce(
+                subject=subject,
+                agent_identifier=agent_identifier,
+                action="memory:create",
+                sensitivity=sensitivity,
+            )
+        except PermissionDenied as exc:
+            return _permission_denied_response(exc)
 
         entry = MemoryEntry.objects.create(
             title=data["title"],
@@ -131,8 +184,19 @@ class MemoryEntryDetailApiView(View):
 
     http_method_names = ["get", "put", "patch", "delete"]
 
-    def get(self, request: HttpRequest, pk: int, *args, **kwargs) -> JsonResponse:
+    def get(self, request: HttpRequest, pk: int, *args, **kwargs) -> JsonResponse | HttpResponse:
         entry = get_object_or_404(MemoryEntry, pk=pk)
+        try:
+            subject = _extract_subject(request)
+            agent_identifier = _extract_agent_identifier(request)
+            policy_engine.enforce(
+                subject=subject,
+                agent_identifier=agent_identifier,
+                action="memory:retrieve",
+                sensitivity=entry.sensitivity,
+            )
+        except PermissionDenied as exc:
+            return _permission_denied_response(exc)
         data = {
             "id": entry.pk,
             "title": entry.title,
@@ -159,6 +223,17 @@ class MemoryEntryDetailApiView(View):
 
         with transaction.atomic():
             entry = get_object_or_404(MemoryEntry.objects.select_for_update(), pk=pk)
+            try:
+                subject = _extract_subject(request)
+                agent_identifier = _extract_agent_identifier(request)
+                policy_engine.enforce(
+                    subject=subject,
+                    agent_identifier=agent_identifier,
+                    action="memory:delete",
+                    sensitivity=entry.sensitivity,
+                )
+            except PermissionDenied as exc:
+                return _permission_denied_response(exc)
             if entry.version != match_version:
                 return HttpResponse(_("Version conflict."), status=412)
             entry.delete()
@@ -188,6 +263,17 @@ class MemoryEntryDetailApiView(View):
 
         with transaction.atomic():
             entry = get_object_or_404(MemoryEntry.objects.select_for_update(), pk=pk)
+            try:
+                subject = _extract_subject(request)
+                agent_identifier = _extract_agent_identifier(request)
+                policy_engine.enforce(
+                    subject=subject,
+                    agent_identifier=agent_identifier,
+                    action="memory:update",
+                    sensitivity=updates.get("sensitivity", entry.sensitivity),
+                )
+            except PermissionDenied as exc:
+                return _permission_denied_response(exc)
             if entry.version != match_version:
                 return HttpResponse(_("Version conflict."), status=412)
 
