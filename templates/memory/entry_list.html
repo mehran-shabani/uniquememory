@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<h1>Memory Entries</h1>
+
+<form method="get" class="filters">
+  <label for="sensitivity">Sensitivity:</label>
+  <select name="sensitivity" id="sensitivity">
+    <option value="">All</option>
+    {% for value, label in sensitivity_choices %}
+      <option value="{{ value }}" {% if value == selected_sensitivity %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+
+  <label for="entry_type">Type:</label>
+  <select name="entry_type" id="entry_type">
+    <option value="">All</option>
+    {% for value, label in type_choices %}
+      <option value="{{ value }}" {% if value == selected_entry_type %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit">Apply Filters</button>
+</form>
+
+<table class="memory-table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Sensitivity</th>
+      <th>Type</th>
+      <th>Updated</th>
+      <th>Version</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry in entries %}
+      <tr>
+        <td><a href="{% url 'memory:entry-detail' entry.pk %}">{{ entry.title }}</a></td>
+        <td>{{ entry.get_sensitivity_display }}</td>
+        <td>{{ entry.get_entry_type_display }}</td>
+        <td>{{ entry.updated_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ entry.version }}</td>
+      </tr>
+    {% empty %}
+      <tr>
+        <td colspan="5">No entries found for the current filters.</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if is_paginated %}
+  <nav class="pagination">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}&sensitivity={{ selected_sensitivity }}&entry_type={{ selected_entry_type }}">Previous</a>
+    {% endif %}
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&sensitivity={{ selected_sensitivity }}&entry_type={{ selected_entry_type }}">Next</a>
+    {% endif %}
+  </nav>
+{% endif %}
+{% endblock %}

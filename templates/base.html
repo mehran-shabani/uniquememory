@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{% block title %}Unique Memory{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/milligram@1.4.1/dist/milligram.min.css">
+  <style>
+    body { margin: 2rem; }
+    .filters { margin-bottom: 2rem; display: flex; gap: 1rem; align-items: flex-end; }
+    .memory-table { width: 100%; border-collapse: collapse; }
+    .memory-table th, .memory-table td { border-bottom: 1px solid #ddd; padding: 0.5rem; }
+    .pagination { margin-top: 1rem; display: flex; gap: 1rem; align-items: center; }
+    .memory-entry .metadata { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 1rem; }
+    .memory-entry .content { margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/memory/">Memory Entries</a>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

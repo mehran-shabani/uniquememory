@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article class="memory-entry">
+  <header>
+    <h1>{{ entry.title }}</h1>
+    <ul class="metadata">
+      <li><strong>Sensitivity:</strong> {{ entry.get_sensitivity_display }}</li>
+      <li><strong>Type:</strong> {{ entry.get_entry_type_display }}</li>
+      <li><strong>Version:</strong> {{ entry.version }}</li>
+      <li><strong>Last updated:</strong> {{ entry.updated_at|date:"Y-m-d H:i" }}</li>
+    </ul>
+  </header>
+  <section class="content">
+    <p>{{ entry.content|linebreaks }}</p>
+  </section>
+  {% if policies %}
+  <section class="policies">
+    <h2>Access Policies</h2>
+    <ul>
+      {% for policy in policies %}
+        <li>
+          <strong>{{ policy.name }}</strong> — {{ policy.get_access_level_display }}
+          {% if policy.allowed_roles %}
+            <div>Roles: {{ policy.allowed_roles|join:", " }}</div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+  {% if chunks %}
+  <section class="chunks">
+    <h2>Chunks</h2>
+    <ol>
+      {% for chunk in chunks %}
+        <li>
+          <h3>Chunk {{ chunk.position }}</h3>
+          <p>{{ chunk.content }}</p>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}
