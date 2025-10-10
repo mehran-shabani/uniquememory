@@ -6,4 +6,4 @@ class MemoryConfig(AppConfig):
     name = "memory"
 
     def ready(self) -> None:  # pragma: no cover - import side effects
-        from . import signals  # noqa: F401
+        from . import signals

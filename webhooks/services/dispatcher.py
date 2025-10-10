@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import requests
 from django.utils import timezone
@@ -20,23 +20,9 @@ class WebhookDispatcher:
     def __init__(self, *, session: Optional[requests.Session] = None) -> None:
         self._session = session
 
-    # …
-
-    def dispatch(self, subscription: Subscription, body: dict) -> None:
--        response = self.session.post(subscription.target_url, json=body, timeout=5)
-        session = self._session or requests.Session()
-        try:
-            response = session.post(subscription.target_url, json=body, timeout=5)
-            response.raise_for_status()
-        finally:
-            if self._session is None:
-                session.close()
-
-    def dispatch(self, *, event: str, data: Dict[str, Any]) -> None:
+    def dispatch(self, *, event: str, data: dict[str, Any]) -> None:
         subscriptions = WebhookSubscription.objects.active().for_event(event)
         for subscription in subscriptions:
-            if not subscription.allows_event(event):
-                continue
             payload = self._build_payload(event=event, data=data)
             try:
                 self._deliver(subscription, payload)
@@ -46,7 +32,7 @@ class WebhookDispatcher:
             else:
                 subscription.mark_success()
 
-    def _build_payload(self, *, event: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_payload(self, *, event: str, data: dict[str, Any]) -> dict[str, Any]:
         payload = {
             "event": event,
             "ts": timezone.now().isoformat(),
@@ -54,12 +40,17 @@ class WebhookDispatcher:
         }
         return payload
 
-    def _deliver(self, subscription: WebhookSubscription, payload: Dict[str, Any]) -> None:
+    def _deliver(self, subscription: WebhookSubscription, payload: dict[str, Any]) -> None:
         body = self._sign_payload(subscription.secret, payload)
-        response = self.session.post(subscription.target_url, json=body, timeout=5)
-        response.raise_for_status()
+        session = self._session or requests.Session()
+        try:
+            response = session.post(subscription.target_url, json=body, timeout=5)
+            response.raise_for_status()
+        finally:
+            if self._session is None:
+                session.close()
 
-    def _sign_payload(self, secret: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _sign_payload(self, secret: str, payload: dict[str, Any]) -> dict[str, Any]:
         serialized = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
         signature = hmac.new(secret.encode(), serialized, hashlib.sha256).hexdigest()
         signed_payload = dict(payload)

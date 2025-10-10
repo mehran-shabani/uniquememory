@@ -6,4 +6,4 @@ class WebhooksConfig(AppConfig):
     name = "webhooks"
 
     def ready(self) -> None:  # pragma: no cover - import side effects
-        from . import signal_handlers  # noqa: F401
+        from . import signal_handlers

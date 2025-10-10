@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
+from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
-def _serialize_instance(instance: Model) -> dict[str, Any]:
-    # (body unchanged)
-    ...
-
-def _build_changes(instance: Model, update_fields: Iterable[str] | None) -> dict[str, Any] | None:
-    # (body unchanged)
-    ...
-
-from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import ManyToManyField, Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -24,7 +17,30 @@ from .models import AuditLog
 _TRACKED_APP_LABELS = {"memory", "chunks", "policies"}
 
 
-def _serialize_instance(instance: Model) -> Dict[str, Any]:
+def _make_json_serializable(value: Any) -> Any:
+    """Recursively convert Django model data to JSON-friendly primitives."""
+
+    if isinstance(value, dict):
+        return {key: _make_json_serializable(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_make_json_serializable(item) for item in value]
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, bytes):
+        try:
+            return value.decode()
+        except UnicodeDecodeError:  # pragma: no cover - defensive fallback
+            return value.hex()
+    return value
+
+
+def _serialize_instance(instance: Model) -> dict[str, Any]:
+    """Serialize a model instance to a JSON-serializable dict."""
+
     opts = instance._meta
     field_names = [field.name for field in opts.fields]
     data = model_to_dict(instance, fields=field_names)
@@ -33,15 +49,20 @@ def _serialize_instance(instance: Model) -> Dict[str, Any]:
     # Include many-to-many relations as lists of primary keys for additional context.
     for field in opts.many_to_many:
         if isinstance(field, ManyToManyField):
-            data[field.name] = list(getattr(instance, field.name).values_list("pk", flat=True))
-    return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
+            data[field.name] = list(
+                getattr(instance, field.name).values_list("pk", flat=True)
+            )
+
+    return _make_json_serializable(data)
 
 
-def _build_changes(instance: Model, update_fields: Iterable[str] | None) -> Dict[str, Any] | None:
+def _build_changes(instance: Model, update_fields: Iterable[str] | None) -> dict[str, Any] | None:
+    """Return the updated fields in a JSON-friendly format."""
+
     if not update_fields:
         return None
     changes = {field: getattr(instance, field) for field in update_fields}
-    return json.loads(json.dumps(changes, cls=DjangoJSONEncoder))
+    return _make_json_serializable(changes)
 
 
 @receiver(post_save)

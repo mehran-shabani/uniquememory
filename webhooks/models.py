@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from typing import Iterable
+from collections.abc import Iterable
 
 from django.db import models
 from django.utils import timezone
@@ -12,7 +12,7 @@ class WebhookSubscriptionQuerySet(models.QuerySet):
         return self.filter(status=WebhookSubscription.STATUS_ACTIVE)
 
     def for_event(self, event_name: str) -> "WebhookSubscriptionQuerySet":
-        return self.filter(events__contains=event_name)
+        return self.filter(events__contains=[event_name])
 
 
 class WebhookSubscription(models.Model):
