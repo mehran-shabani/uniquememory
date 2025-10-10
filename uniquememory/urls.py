@@ -19,6 +19,7 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from graph.api.views import GraphRelatedView
 from memory.api.views import MemoryQueryView
 
 urlpatterns = [
@@ -30,4 +31,5 @@ urlpatterns = [
     path("memory/", include("memory.urls")),
     path("portal/", include("portal.urls")),
     path("v1/memory/<uuid:user_id>/query", MemoryQueryView.as_view(), name="memory-query"),
+    path("v1/graph/related", GraphRelatedView.as_view(), name="graph-related"),
 ]
