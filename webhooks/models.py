@@ -12,7 +12,7 @@ class WebhookSubscriptionQuerySet(models.QuerySet):
         return self.filter(status=WebhookSubscription.STATUS_ACTIVE)
 
     def for_event(self, event_name: str) -> "WebhookSubscriptionQuerySet":
-        return self.filter(events__icontains=event_name)
+        return self.filter(events__contains=event_name)
 
 
 class WebhookSubscription(models.Model):
