@@ -92,20 +92,16 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
     return {"entry": _serialize_entry(entry)}
 
 
-def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, object]:
-    entry_payload = payload.get("entry")
-    if not isinstance(entry_payload, dict):
-        raise PermissionDenied("entry payload must be an object.")
-
-    entry_id = entry_payload.get("id")
-    requested_sensitivity = entry_payload.get("sensitivity")
-    if requested_sensitivity and requested_sensitivity not in {choice for choice, _ in MemoryEntry.SENSITIVITY_CHOICES}:
-        raise PermissionDenied("Invalid sensitivity value.")
-
-    entry_type = entry_payload.get("entry_type", MemoryEntry.TYPE_NOTE)
-    if entry_type and entry_type not in {choice for choice, _ in MemoryEntry.TYPE_CHOICES}:
-        raise PermissionDenied("Invalid entry_type value.")
-
+        updates: dict[str, object] = {
+            key: value
+            for key, value in entry_payload.items()
+            if key in {"title", "content", "sensitivity", "entry_type"}
+        }
+        # نوع فیلدهای متنی رو تو آپدیت هم چک کنیم
+        if "title" in updates and not isinstance(updates["title"], str):
+            raise PermissionDenied("title must be a string.")
+        if "content" in updates and not isinstance(updates["content"], str):
+            raise PermissionDenied("content must be a string.")
     if entry_id is None:
         sensitivity = requested_sensitivity or MemoryEntry.SENSITIVITY_PUBLIC
         validator.validate(
