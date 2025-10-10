@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from unittest.mock import patch
 
 from django.core.cache import cache
@@ -29,9 +28,6 @@ from audit import signals as audit_signals
 class McpToolIntegrationTests(TestCase):
     def setUp(self) -> None:
         cache.clear()
-        self.graph_connect_patch = patch("graph.services.sync.graph_sync_service.connect")
-        self.graph_connect_patch.start()
-        self.addCleanup(self.graph_connect_patch.stop)
         from graph.services.sync import graph_sync_service
 
         self.graph_connect_patch = patch("graph.services.sync.graph_sync_service.connect")
@@ -201,16 +197,12 @@ class McpToolIntegrationTests(TestCase):
             scopes=[CONSENT_MANAGE_SCOPE],
             consent=None,
         )
-        node_payload = json.loads(
-            json.dumps(
-                {
-                    "user_id": str(self.user.pk),
-                    "agent_identifier": "node-agent",
-                    "scopes": [SCOPE_MEMORY_READ, SCOPE_MEMORY_SEARCH],
-                    "sensitivity_levels": [MemoryEntry.SENSITIVITY_PUBLIC],
-                }
-            )
-        )
+        node_payload = {
+            "user_id": str(self.user.pk),
+            "agent_identifier": "node-agent",
+            "scopes": [SCOPE_MEMORY_READ, SCOPE_MEMORY_SEARCH],
+            "sensitivity_levels": [MemoryEntry.SENSITIVITY_PUBLIC],
+        }
         grant_response = execute_tool(
             "consent.grant",
             bearer_token=bearer,
