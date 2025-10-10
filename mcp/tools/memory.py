@@ -24,7 +24,7 @@ def _serialize_entry(entry: MemoryEntry) -> Dict[str, object]:
         "sensitivity": entry.sensitivity,
         "entry_type": entry.entry_type,
         "version": entry.version,
-        "updated_at": entry.updated_at,
+        "updated_at": entry.updated_at.isoformat(),
     }
 
 
