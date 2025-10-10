@@ -8,7 +8,6 @@ from django.db import models
 from django.utils import timezone
 
 from memory.models import MemoryEntry
-
 SCOPE_MEMORY_READ = "memory.read"
 SCOPE_MEMORY_WRITE = "memory.write"
 SCOPE_MEMORY_SEARCH = "memory.search"
@@ -112,6 +111,9 @@ class Consent(models.Model):
         self.status = self.STATUS_REVOKED
         self.revoked_at = timezone.now()
         self.save(update_fields=["status", "revoked_at", "updated_at"])
+        from . import signals
+
+        signals.consent_revoked.send(sender=self.__class__, consent=self)
 
     def allows_scope(self, scope: str) -> bool:
         return scope in set(self.scopes)

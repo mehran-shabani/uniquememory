@@ -5,3 +5,6 @@ class ConsentsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "consents"
     verbose_name = "User Consents"
+
+    def ready(self) -> None:  # pragma: no cover - import side effects
+        from . import signals
