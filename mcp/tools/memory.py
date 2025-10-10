@@ -178,13 +178,12 @@ def memory_delete(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         except MemoryEntry.DoesNotExist as exc:
             raise PermissionDenied("Memory entry not found.") from exc
 
-        context = validator.validate(
+        validator.validate(
             bearer_token,
             action="memory:delete",
             required_scopes=[SCOPE_MEMORY_WRITE],
             sensitivity=entry.sensitivity,
         )
-
         if version is not None and entry.version != version:
             raise PermissionDenied("Version conflict detected.")
 
