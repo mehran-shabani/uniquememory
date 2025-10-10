@@ -32,6 +32,20 @@ class McpToolIntegrationTests(TestCase):
         self.graph_connect_patch = patch("graph.services.sync.graph_sync_service.connect")
         self.graph_connect_patch.start()
         self.addCleanup(self.graph_connect_patch.stop)
+        from graph.services.sync import graph_sync_service
+
+        self.graph_connect_patch = patch("graph.services.sync.graph_sync_service.connect")
+        self.graph_connect_patch.start()
+
+        def _restore_signal_state() -> None:
+            # Stop mocking connect and re-attach all of our sync handlers
+            self.graph_connect_patch.stop()
+            graph_sync_service.connect()
+            post_save.connect(audit_signals.audit_post_save, weak=False)
+            post_delete.connect(audit_signals.audit_post_delete, weak=False)
+
+        self.addCleanup(_restore_signal_state)
+
         post_save.disconnect(dispatch_uid="graph.sync.memory.save", sender=MemoryEntry)
         post_delete.disconnect(dispatch_uid="graph.sync.memory.delete", sender=MemoryEntry)
         post_save.disconnect(dispatch_uid="graph.sync.consent.save", sender=Consent)
