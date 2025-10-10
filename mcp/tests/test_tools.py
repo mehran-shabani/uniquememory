@@ -111,7 +111,7 @@ class McpToolIntegrationTests(TestCase):
         token["scopes"] = scopes
         if consent is not None:
             token["consent_id"] = consent.pk
-        return f"Bearer {str(token)}"
+        return f"Bearer {token!s}"
 
     def test_manifest_lists_expected_tools(self):
         tool_names = {tool["name"] for tool in MANIFEST["tools"]}
