@@ -14,9 +14,6 @@ class GraphNode(models.Model):
 
     class Meta:
         unique_together = ("node_type", "reference_id")
-    class Meta:
-        unique_together = ("node_type", "reference_id")
-
     def __str__(self) -> str:
         return f"{self.node_type}:{self.reference_id}"
 
