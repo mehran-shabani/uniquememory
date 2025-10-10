@@ -193,8 +193,8 @@ def memory_delete(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
 
 
 __all__ = [
-    "memory_search",
-    "memory_get",
-    "memory_upsert",
     "memory_delete",
+    "memory_get",
+    "memory_search",
+    "memory_upsert",
 ]
