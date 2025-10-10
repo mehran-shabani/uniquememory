@@ -18,7 +18,19 @@ class WebhookDispatcher:
     """Pushes webhook payloads to subscribed companies."""
 
     def __init__(self, *, session: Optional[requests.Session] = None) -> None:
-        self.session = session or requests.Session()
+        self._session = session
+
+    # …
+
+    def dispatch(self, subscription: Subscription, body: dict) -> None:
+-        response = self.session.post(subscription.target_url, json=body, timeout=5)
+        session = self._session or requests.Session()
+        try:
+            response = session.post(subscription.target_url, json=body, timeout=5)
+            response.raise_for_status()
+        finally:
+            if self._session is None:
+                session.close()
 
     def dispatch(self, *, event: str, data: Dict[str, Any]) -> None:
         subscriptions = WebhookSubscription.objects.active().for_event(event)
