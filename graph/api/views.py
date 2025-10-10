@@ -80,8 +80,14 @@ class GraphRelatedView(View):
         candidates_param = params.get("candidates")
         if candidates_param:
             values.extend(part.strip() for part in candidates_param.split(","))
-        return [value for value in (value.strip() for value in values) if value]
 
+        seen = set()
+        deduped: list[str] = []
+        for value in (value.strip() for value in values):
+            if value and value not in seen:
+                seen.add(value)
+                deduped.append(value)
+        return deduped
     # ------------------------------------------------------------------
     # Ranking helpers
     # ------------------------------------------------------------------
