@@ -35,24 +35,27 @@ class GraphSyncService:
             self._handle_memory_entry_saved,
             sender=MemoryEntry,
             dispatch_uid="graph.sync.memory.save",
+            weak=False,
         )
         post_delete.connect(
             self._handle_memory_entry_deleted,
             sender=MemoryEntry,
             dispatch_uid="graph.sync.memory.delete",
+            weak=False,
         )
         post_save.connect(
             self._handle_consent_saved,
             sender=Consent,
             dispatch_uid="graph.sync.consent.save",
+            weak=False,
         )
         post_delete.connect(
             self._handle_consent_deleted,
             sender=Consent,
             dispatch_uid="graph.sync.consent.delete",
+            weak=False,
         )
         self._connected = True
-
     # ------------------------------------------------------------------
     # Signal handlers
     # ------------------------------------------------------------------
