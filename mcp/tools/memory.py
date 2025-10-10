@@ -159,8 +159,7 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
         for field, value in updates.items():
             setattr(entry, field, value)
         entry.version = expected_version + 1
-        entry.save(update_fields=list(updates.keys()) + ["version", "updated_at"])
-
+        entry.save(update_fields=[*updates.keys(), "version", "updated_at"])
     return {"entry_id": entry.pk, "version": entry.version}
 
 
