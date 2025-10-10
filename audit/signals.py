@@ -1,7 +1,16 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Iterable
+from collections.abc import Iterable
+from typing import Any
+
+def _serialize_instance(instance: Model) -> dict[str, Any]:
+    # (body unchanged)
+    ...
+
+def _build_changes(instance: Model, update_fields: Iterable[str] | None) -> dict[str, Any] | None:
+    # (body unchanged)
+    ...
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import ManyToManyField, Model
