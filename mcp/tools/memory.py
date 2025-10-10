@@ -42,8 +42,12 @@ def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         required_scopes=[SCOPE_MEMORY_SEARCH],
     )
 
+    user_id_from_payload = payload.get("user_id")
+    if user_id_from_payload and str(user_id_from_payload) != str(context.subject.pk):
+        raise PermissionDenied("Searching on behalf of another user is not permitted.")
+
     raw_results = query_service.search(
-        user_id=str(payload.get("user_id") or context.subject.pk),
+        user_id=str(context.subject.pk),
         query=query,
         limit=limit,
     )
