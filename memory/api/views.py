@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from django.http import HttpRequest, HttpResponseBadRequest, JsonResponse
+from django.core.exceptions import PermissionDenied
+from django.http import (HttpRequest, HttpResponse, HttpResponseBadRequest,
+                         JsonResponse)
 from django.shortcuts import get_object_or_404
 from django.views import View
 
 from accounts.models import User
 from memory.services.query import HybridQueryService
+from policies.engine import PolicyEngine
 
 
 class MemoryQueryView(View):
@@ -19,6 +22,7 @@ class MemoryQueryView(View):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.service = HybridQueryService()
+        self.policy_engine = PolicyEngine()
 
     def post(self, request: HttpRequest, user_id: str, *args: Any, **kwargs: Any) -> JsonResponse:
         user = get_object_or_404(User, pk=user_id)
@@ -34,6 +38,18 @@ class MemoryQueryView(View):
         limit = payload.get("limit", 10)
         if not isinstance(limit, int) or limit <= 0:
             return HttpResponseBadRequest("Limit must be a positive integer.")
+
+        agent_identifier = request.headers.get("X-Agent-ID")
+        if not agent_identifier:
+            return HttpResponse("Missing X-Agent-ID header.", status=403)
+        try:
+            self.policy_engine.enforce(
+                subject=user,
+                agent_identifier=agent_identifier,
+                action="memory:query",
+            )
+        except PermissionDenied as exc:
+            return HttpResponse(str(exc), status=403)
 
         results = self.service.search(user_id=str(user.pk), query=query, limit=limit)
         response_payload = {

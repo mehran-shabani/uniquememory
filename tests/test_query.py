@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import User
+from consents.models import Consent, SCOPE_MEMORY_READ, SCOPE_MEMORY_SEARCH
 from embeddings.models import Embedding
 from memory.models import MemoryEntry
 
@@ -16,6 +17,7 @@ class HybridQueryApiTests(TestCase):
     def setUp(self) -> None:
         cache.clear()
         self.user = User.objects.create_user("alice@example.com", "password")
+        self.agent_identifier = "test-agent"
         self.entry_alpha = MemoryEntry.objects.create(
             title="Alpha release plan",
             content="Details about the alpha project milestones and release goals.",
@@ -54,11 +56,28 @@ class HybridQueryApiTests(TestCase):
             model_name="test-model",
         )
 
+        Consent.objects.create(
+            user=self.user,
+            agent_identifier=self.agent_identifier,
+            scopes=[SCOPE_MEMORY_SEARCH, SCOPE_MEMORY_READ],
+            sensitivity_levels=[
+                MemoryEntry.SENSITIVITY_PUBLIC,
+                MemoryEntry.SENSITIVITY_CONFIDENTIAL,
+                MemoryEntry.SENSITIVITY_SECRET,
+            ],
+            status=Consent.STATUS_ACTIVE,
+        )
+
         self.url = reverse("memory-query", kwargs={"user_id": self.user.pk})
 
     def _post_query(self, query: str, limit: int = 10):
         payload = json.dumps({"query": query, "limit": limit})
-        return self.client.post(self.url, data=payload, content_type="application/json")
+        return self.client.post(
+            self.url,
+            data=payload,
+            content_type="application/json",
+            HTTP_X_AGENT_ID=self.agent_identifier,
+        )
 
     def test_hybrid_query_orders_results(self):
         with patch("memory.services.query.HybridQueryService._encode_query", return_value=[1.0, 0.0]):

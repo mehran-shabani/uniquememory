@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     "chunks",
     "policies",
     "audit",
+    "consents",
+    "portal",
 ]
 
 MIDDLEWARE = [
