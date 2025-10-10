@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
+    "embeddings",
     "accounts",
     "companies",
     "agents",
@@ -151,6 +152,9 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
 }
+
+EMBEDDINGS_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

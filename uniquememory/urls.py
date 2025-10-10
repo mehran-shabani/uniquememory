@@ -19,10 +19,13 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from memory.api.views import MemoryQueryView
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/accounts/", include("accounts.api.urls")),
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("memory/", include("memory.urls")),
+    path("v1/memory/<uuid:user_id>/query", MemoryQueryView.as_view(), name="memory-query"),
 ]
