@@ -82,7 +82,7 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
     except MemoryEntry.DoesNotExist as exc:
         raise PermissionDenied("Memory entry not found.") from exc
 
-    context = validator.validate(
+    validator.validate(
         bearer_token,
         action="memory:retrieve",
         required_scopes=[SCOPE_MEMORY_READ],
@@ -90,7 +90,6 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
     )
 
     return {"entry": _serialize_entry(entry)}
-
 
         updates: dict[str, object] = {
             key: value
