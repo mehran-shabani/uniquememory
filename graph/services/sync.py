@@ -173,11 +173,20 @@ class GraphSyncService:
         sensitivity_levels: Iterable[str] | None,
     ) -> None:
         levels = list(sensitivity_levels or [])
-        existing_edges = GraphEdge.objects.filter(
+        existing_permits = GraphEdge.objects.filter(
             source=consent_node,
             relation_type="permits_sensitivity",
-        )
-        existing_targets = {edge.target.reference_id: edge for edge in existing_edges.select_related("target")}
+        ).select_related("target")
+        existing_permits_by_level = {
+            edge.target.reference_id: edge for edge in existing_permits
+        }
+        existing_permitted_by = GraphEdge.objects.filter(
+            target=consent_node,
+            relation_type="permitted_by",
+        ).select_related("source")
+        existing_permitted_by_by_level = {
+            edge.source.reference_id: edge for edge in existing_permitted_by
+        }
         for level in levels:
             sensitivity_node = self._upsert_node(
                 node_type=self.sensitivity_node_type,
@@ -186,9 +195,12 @@ class GraphSyncService:
             )
             self._ensure_edge(consent_node, sensitivity_node, "permits_sensitivity", weight=0.6)
             self._ensure_edge(sensitivity_node, consent_node, "permitted_by", weight=0.6)
-            existing_targets.pop(level, None)
+            existing_permits_by_level.pop(level, None)
+            existing_permitted_by_by_level.pop(level, None)
         # Remove stale sensitivity edges that are no longer granted
-        for stale in existing_targets.values():
+        for stale in existing_permits_by_level.values():
+            GraphEdge.objects.filter(pk=stale.pk).delete()
+        for stale in existing_permitted_by_by_level.values():
             GraphEdge.objects.filter(pk=stale.pk).delete()
 
 
