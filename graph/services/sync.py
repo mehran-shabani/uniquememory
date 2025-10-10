@@ -59,7 +59,7 @@ class GraphSyncService:
     # ------------------------------------------------------------------
     # Signal handlers
     # ------------------------------------------------------------------
-    def _handle_memory_entry_saved(self, sender, instance: MemoryEntry, **_kwargs: Any) -> None:
+    def _handle_memory_entry_saved(self, _sender, instance: MemoryEntry, **_kwargs: Any) -> None:
         def sync() -> None:
             metadata = {
                 "sensitivity": instance.sensitivity,
