@@ -1,10 +1,9 @@
 from django.apps import AppConfig
 
 
-class ConsentsConfig(AppConfig):
+class WebhooksConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "consents"
-    verbose_name = "User Consents"
+    name = "webhooks"
 
     def ready(self) -> None:  # pragma: no cover - import side effects
-        from . import signals  # noqa: F401
+        from . import signal_handlers  # noqa: F401

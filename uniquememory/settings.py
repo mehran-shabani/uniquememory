@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "portal",
     "graph",
     "mcp",
+    "webhooks",
 ]
 
 MIDDLEWARE = [

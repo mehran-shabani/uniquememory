@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, Iterable
 
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import ManyToManyField, Model
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
@@ -23,13 +25,14 @@ def _serialize_instance(instance: Model) -> Dict[str, Any]:
     for field in opts.many_to_many:
         if isinstance(field, ManyToManyField):
             data[field.name] = list(getattr(instance, field.name).values_list("pk", flat=True))
-    return data
+    return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
 
 
 def _build_changes(instance: Model, update_fields: Iterable[str] | None) -> Dict[str, Any] | None:
     if not update_fields:
         return None
-    return {field: getattr(instance, field) for field in update_fields}
+    changes = {field: getattr(instance, field) for field in update_fields}
+    return json.loads(json.dumps(changes, cls=DjangoJSONEncoder))
 
 
 @receiver(post_save)
