@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from typing import Dict, List
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -10,7 +10,6 @@ from memory.models import MemoryEntry
 from memory.services.query import HybridQueryService, HybridSearchResult
 
 from ..auth import BearerTokenValidator
-
 
 validator = BearerTokenValidator()
 query_service = HybridQueryService()
@@ -53,7 +52,8 @@ def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     )
 
     allowed: List[HybridSearchResult] = [
-        result for result in raw_results
+        result
+        for result in raw_results
         if context.consent and context.consent.allows_sensitivity(result.sensitivity)
     ]
     allowed = allowed[:limit]
@@ -91,16 +91,51 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
 
     return {"entry": _serialize_entry(entry)}
 
-        updates: dict[str, object] = {
-            key: value
-            for key, value in entry_payload.items()
-            if key in {"title", "content", "sensitivity", "entry_type"}
-        }
-        # نوع فیلدهای متنی رو تو آپدیت هم چک کنیم
-        if "title" in updates and not isinstance(updates["title"], str):
-            raise PermissionDenied("title must be a string.")
-        if "content" in updates and not isinstance(updates["content"], str):
-            raise PermissionDenied("content must be a string.")
+
+def _extract_entry_payload(payload: Dict[str, object]) -> Dict[str, object]:
+    entry_payload = payload.get("entry") or payload
+    if not isinstance(entry_payload, dict):
+        raise PermissionDenied("Entry payload must be an object.")
+    return entry_payload
+
+
+def _validate_text_field(payload: Dict[str, object], field: str) -> None:
+    if field in payload and not isinstance(payload[field], str):
+        raise PermissionDenied(f"{field} must be a string.")
+
+
+def _validate_choice(value: str | None, *, choices: set[str], field: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise PermissionDenied(f"{field} must be a string.")
+    if value not in choices:
+        raise PermissionDenied(f"Invalid {field} provided.")
+    return value
+
+
+def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, object]:
+    entry_payload = _extract_entry_payload(payload)
+    entry_id = entry_payload.get("id") or payload.get("entry_id")
+
+    sensitivity_choices = {choice for choice, _ in MemoryEntry.SENSITIVITY_CHOICES}
+    requested_sensitivity = _validate_choice(
+        entry_payload.get("sensitivity"),
+        choices=sensitivity_choices,
+        field="sensitivity",
+    )
+
+    type_choices = {choice for choice, _ in MemoryEntry.TYPE_CHOICES}
+    entry_type_value = entry_payload.get("entry_type")
+    validated_entry_type = _validate_choice(
+        entry_type_value,
+        choices=type_choices,
+        field="entry_type",
+    )
+
+    _validate_text_field(entry_payload, "title")
+    _validate_text_field(entry_payload, "content")
+
     if entry_id is None:
         sensitivity = requested_sensitivity or MemoryEntry.SENSITIVITY_PUBLIC
         validator.validate(
@@ -109,15 +144,17 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
             required_scopes=[SCOPE_MEMORY_WRITE],
             sensitivity=sensitivity,
         )
+
         title = entry_payload.get("title")
         content = entry_payload.get("content")
         if not isinstance(title, str) or not isinstance(content, str):
             raise PermissionDenied("title and content must be provided for new entries.")
+
         entry = MemoryEntry.objects.create(
             title=title,
             content=content,
             sensitivity=sensitivity,
-            entry_type=entry_type,
+            entry_type=validated_entry_type or MemoryEntry.TYPE_NOTE,
         )
         return {"entry_id": entry.pk, "version": entry.version}
 
@@ -152,14 +189,21 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
             raise PermissionDenied("Version conflict detected.")
 
         updates = {
-            key: value
-            for key, value in entry_payload.items()
-            if key in {"title", "content", "sensitivity", "entry_type"}
+            key: entry_payload[key]
+            for key in {"title", "content", "sensitivity", "entry_type"}
+            if key in entry_payload
         }
         for field, value in updates.items():
             setattr(entry, field, value)
+        if requested_sensitivity is not None:
+            entry.sensitivity = requested_sensitivity
+        if validated_entry_type is not None:
+            entry.entry_type = validated_entry_type
+
         entry.version = expected_version + 1
-        entry.save(update_fields=[*updates.keys(), "version", "updated_at"])
+        update_fields = {"version", "updated_at", *updates.keys()}
+        entry.save(update_fields=sorted(update_fields))
+
     return {"entry_id": entry.pk, "version": entry.version}
 
 

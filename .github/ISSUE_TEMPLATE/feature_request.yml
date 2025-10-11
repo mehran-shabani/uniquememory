@@ -1,0 +1,41 @@
+name: "Feature request"
+description: "Suggest an enhancement or new capability"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us understand the problem you're trying to solve and why this feature matters.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Provide a short description of the desired feature.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: Describe the pain point or opportunity this feature addresses.
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Outline your proposed approach, including alternatives considered.
+      placeholder: |
+        * Proposed approach
+        * Alternatives
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Define what success looks like (user stories, metrics, etc.).
+  - type: checkboxes
+    id: dependencies
+    attributes:
+      label: Dependencies & risks
+      options:
+        - label: Requires changes to infrastructure or deployment
+        - label: Impacts security or compliance
+        - label: Requires coordination with external teams

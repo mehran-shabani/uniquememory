@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uniquememory"
+version = "0.1.0"
+description = "Unified memory orchestration platform"
+readme = "README.md"
+authors = [{ name = "Unique Memory", email = "dev@uniquememory.local" }]
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+dependencies = [
+    "Django==5.2.7",
+    "djangorestframework>=3.15,<4.0",
+    "djangorestframework-simplejwt>=5.3,<6.0",
+    "sentence-transformers>=3.0.0",
+    "requests>=2.31",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.0",
+    "coverage[toml]>=7.6",
+    "pytest>=8.3",
+    "pytest-cov>=5.0",
+    "pytest-django>=4.8",
+    "ruff>=0.6",
+]
+
+[tool.setuptools.packages.find]
+include = ["*"]
+exclude = ["tests", "tests.*"]
+
+[tool.coverage.run]
+branch = true
+source = ["consents", "gateway", "graph", "mcp", "memory", "policies", "security", "webhooks"]
+omit = [
+    "*/migrations/*",
+    "manage.py",
+    "tests/*",
+    "scripts/*",
+    "*/views.py",
+    "*/management/commands/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 2
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "W", "I", "N", "UP", "RUF"]
+ignore = ["E501"]
+
