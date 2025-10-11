@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest import mock
+
 from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 from rest_framework_simplejwt.tokens import AccessToken
@@ -7,6 +9,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from accounts.models import User
 from consents.models import Consent, SCOPE_MEMORY_WRITE
 from memory.models import MemoryEntry
+from mcp.tools import memory as memory_tools
 from mcp.tools.memory import memory_upsert
 
 
@@ -34,6 +37,10 @@ class MemoryUpsertTests(TestCase):
         token["scopes"] = [SCOPE_MEMORY_WRITE]
         token["consent_id"] = self.consent.pk
         return str(token)
+
+    def test_memory_upsert_requires_dict_payload(self) -> None:
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(bearer_token=self.access_token, payload=["not", "a", "dict"])
 
     def test_memory_upsert_creates_entry(self) -> None:
         payload = {
@@ -120,6 +127,122 @@ class MemoryUpsertTests(TestCase):
                 "entry_id": entry.pk,
                 "version": entry.version,
                 "content": 42,
+            }
+        }
+
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(bearer_token=self.access_token, payload=payload)
+
+    def test_memory_upsert_validates_sensitivity_fields(self) -> None:
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(
+                bearer_token=self.access_token,
+                payload={"entry": {"title": "Bad", "content": "bad", "sensitivity": 123}},
+            )
+
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(
+                bearer_token=self.access_token,
+                payload={
+                    "entry": {
+                        "title": "Bad",
+                        "content": "bad",
+                        "sensitivity": "unknown",
+                    }
+                },
+            )
+
+    def test_memory_upsert_validates_entry_type_fields(self) -> None:
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(
+                bearer_token=self.access_token,
+                payload={"entry": {"title": "Bad", "content": "bad", "entry_type": 42}},
+            )
+
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(
+                bearer_token=self.access_token,
+                payload={
+                    "entry": {
+                        "title": "Bad",
+                        "content": "bad",
+                        "entry_type": "invalid",
+                    }
+                },
+            )
+
+    def test_memory_upsert_requires_integer_entry_id(self) -> None:
+        payload = {"entry": {"entry_id": "abc", "title": "Bad", "content": "bad"}}
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(bearer_token=self.access_token, payload=payload)
+
+    def test_memory_upsert_requires_version_on_update(self) -> None:
+        entry = MemoryEntry.objects.create(title="Doc", content="body")
+        payload = {"entry": {"entry_id": entry.pk}}
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(bearer_token=self.access_token, payload=payload)
+
+    def test_memory_upsert_handles_missing_entry(self) -> None:
+        payload = {"entry": {"entry_id": 9999, "version": 1}}
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(bearer_token=self.access_token, payload=payload)
+
+    def test_memory_upsert_checks_permissions_when_sensitivity_changes(self) -> None:
+        entry = MemoryEntry.objects.create(
+            title="Existing note",
+            content="Content",
+            sensitivity=MemoryEntry.SENSITIVITY_PUBLIC,
+            entry_type=MemoryEntry.TYPE_NOTE,
+        )
+
+        payload = {
+            "entry": {
+                "entry_id": entry.pk,
+                "version": entry.version,
+                "content": "Updated",
+                "sensitivity": MemoryEntry.SENSITIVITY_CONFIDENTIAL,
+            }
+        }
+
+        with mock.patch.object(memory_tools.validator, "ensure_permissions", wraps=memory_tools.validator.ensure_permissions) as ensure:
+            result = memory_upsert(bearer_token=self.access_token, payload=payload)
+
+        entry.refresh_from_db()
+        self.assertEqual(result["version"], entry.version)
+        self.assertGreaterEqual(ensure.call_count, 2)
+
+    def test_memory_upsert_rejects_invalid_sensitivity_updates(self) -> None:
+        entry = MemoryEntry.objects.create(
+            title="Existing note",
+            content="Content",
+            sensitivity=MemoryEntry.SENSITIVITY_PUBLIC,
+            entry_type=MemoryEntry.TYPE_NOTE,
+        )
+
+        payload = {
+            "entry": {
+                "entry_id": entry.pk,
+                "version": entry.version,
+                "sensitivity": None,
+            }
+        }
+
+        with self.assertRaises(PermissionDenied):
+            memory_upsert(bearer_token=self.access_token, payload=payload)
+
+    def test_memory_upsert_rejects_invalid_entry_type_updates(self) -> None:
+        entry = MemoryEntry.objects.create(
+            title="Existing note",
+            content="Content",
+            sensitivity=MemoryEntry.SENSITIVITY_PUBLIC,
+            entry_type=MemoryEntry.TYPE_NOTE,
+        )
+
+        payload = {
+            "entry": {
+                "entry_id": entry.pk,
+                "version": entry.version,
+                "entry_type": None,
             }
         }
 

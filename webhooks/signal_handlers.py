@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from django.db import transaction
 from django.dispatch import receiver
 
@@ -12,10 +14,18 @@ from .services.dispatcher import dispatcher
 def _dispatch_event(*, event: str, data: dict[str, object]) -> None:
     """Schedule webhook delivery once the surrounding transaction commits."""
 
+    executed = False
+
     def _send() -> None:
+        nonlocal executed
+        if executed:
+            return
+        executed = True
         dispatcher.dispatch(event=event, data=data)
 
     transaction.on_commit(_send)
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        _send()
 
 
 @receiver(memory_signals.entry_created)

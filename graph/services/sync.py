@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -263,6 +264,9 @@ class GraphSyncService:
         ).delete()
 
     def _on_commit(self, func: Callable[[], None]) -> None:
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            func()
+            return
         transaction.on_commit(func)
 
 

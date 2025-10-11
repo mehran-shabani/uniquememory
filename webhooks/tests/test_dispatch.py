@@ -6,7 +6,9 @@ from unittest import mock
 from django.test import TestCase
 
 from companies.models import Company
+from consents.models import Consent, SCOPE_MEMORY_READ
 from memory.models import MemoryEntry
+from accounts.models import User
 from webhooks.models import WebhookSubscription
 from webhooks.services.dispatcher import dispatcher
 
@@ -18,7 +20,7 @@ class WebhookDispatchTests(TestCase):
         self.subscription = WebhookSubscription.objects.create(
             company=self.company,
             target_url="https://example.com/webhook",
-            events=["memory.entry.created", "consent.revoked"],
+            events=["memory.entry.created", "consent.created", "consent.revoked"],
             secret="topsecret",
         )
 
@@ -77,3 +79,44 @@ class WebhookDispatchTests(TestCase):
         dispatcher.dispatch(event="consent.created", data={"consent_id": 1})
 
         mock_post.assert_not_called()
+
+    @mock.patch("webhooks.services.dispatcher.requests.Session.post")
+    def test_consent_created_signal_includes_agent_fields(self, mock_post: mock.Mock) -> None:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.raise_for_status.return_value = None
+
+        consent = Consent.objects.create(
+            user=User.objects.create_user("owner@example.com", "password"),
+            agent_identifier="webhook-agent",
+            scopes=[SCOPE_MEMORY_READ],
+            sensitivity_levels=[MemoryEntry.SENSITIVITY_PUBLIC],
+            status=Consent.STATUS_ACTIVE,
+        )
+
+        self.assertTrue(mock_post.called)
+        body = mock_post.call_args.kwargs["json"]
+        self.assertEqual(body["event"], "consent.created")
+        self.assertEqual(body["consent_id"], consent.pk)
+        self.assertEqual(body["agent_identifier"], consent.agent_identifier)
+        self.assertEqual(body["status"], consent.status)
+
+    @mock.patch("webhooks.services.dispatcher.requests.Session.post")
+    def test_consent_revoked_signal_includes_revoked_timestamp(self, mock_post: mock.Mock) -> None:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.raise_for_status.return_value = None
+
+        consent = Consent.objects.create(
+            user=User.objects.create_user("owner2@example.com", "password"),
+            agent_identifier="webhook-agent",
+            scopes=[SCOPE_MEMORY_READ],
+            sensitivity_levels=[MemoryEntry.SENSITIVITY_PUBLIC],
+            status=Consent.STATUS_ACTIVE,
+        )
+
+        consent.revoke()
+
+        self.assertTrue(mock_post.called)
+        body = mock_post.call_args.kwargs["json"]
+        self.assertEqual(body["event"], "consent.revoked")
+        self.assertEqual(body["consent_id"], consent.pk)
+        self.assertIsNotNone(body["revoked_at"])
