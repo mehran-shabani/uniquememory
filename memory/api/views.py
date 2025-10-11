@@ -4,14 +4,19 @@ import json
 from typing import Any
 
 from django.core.exceptions import PermissionDenied
-from django.http import (HttpRequest, HttpResponse, HttpResponseBadRequest,
-                         JsonResponse)
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseBadRequest,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404
 from django.views import View
 
 from accounts.models import User
 from memory.services.query import HybridQueryService
 from policies.engine import PolicyEngine
+from security.dlp import sanitize_output, sanitize_text
 
 
 class MemoryQueryView(View):
@@ -49,12 +54,14 @@ class MemoryQueryView(View):
                 action="memory:query",
             )
         except PermissionDenied as exc:
-            return HttpResponse(str(exc), status=403)
+            return HttpResponse(sanitize_text(str(exc)), status=403)
 
         results = self.service.search(user_id=str(user.pk), query=query, limit=limit)
-        response_payload = {
-            "user_id": str(user.pk),
-            "count": len(results),
-            "results": [result.to_dict() for result in results],
-        }
+        response_payload = sanitize_output(
+            {
+                "user_id": str(user.pk),
+                "count": len(results),
+                "results": [result.to_dict() for result in results],
+            }
+        )
         return JsonResponse(response_payload)

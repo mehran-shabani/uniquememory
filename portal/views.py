@@ -8,6 +8,7 @@ from django.urls import reverse_lazy
 from django.views.generic import TemplateView
 
 from consents.models import Consent
+from security.dlp import sanitize_output, sanitize_text
 
 from .forms import ConsentGrantForm, ConsentRevokeForm
 
@@ -25,22 +26,31 @@ class ConsentManagementView(LoginRequiredMixin, TemplateView):
                 "grant_form": kwargs.get("grant_form") or ConsentGrantForm(),
             }
         )
-        return context
+        return sanitize_output(context)
 
     def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
         if "consent_id" in request.POST:
             form = ConsentRevokeForm(request.POST, user=request.user)
             if form.is_valid():
                 consent = form.save(user=request.user)
-                messages.success(request, f"Consent for {consent.agent_identifier} revoked.")
+                messages.success(
+                    request,
+                    sanitize_text(f"Consent for {consent.agent_identifier} revoked."),
+                )
             else:
-                messages.error(request, "Unable to revoke consent. Please try again.")
+                messages.error(
+                    request,
+                    "Unable to revoke consent. Please try again.",
+                )
             return redirect("portal:consents")
 
         form = ConsentGrantForm(request.POST)
         if form.is_valid():
             consent = form.save(user=request.user)
-            messages.success(request, f"Consent for {consent.agent_identifier} granted.")
+            messages.success(
+                request,
+                sanitize_text(f"Consent for {consent.agent_identifier} granted."),
+            )
             return redirect("portal:consents")
 
         messages.error(request, "Please correct the errors below.")
