@@ -1,0 +1,25 @@
+{
+  "name": "uniquememory",
+  "version": "1.0.0",
+  "description": "Manifest MCP برای یکپارچه‌سازی حافظه منحصربه‌فرد با کلاینت‌های چندعاملی.",
+  "capabilities": {
+    "search": {
+      "endpoint": "/memories/search",
+      "method": "POST",
+      "auth": "oauth2"
+    },
+    "ingest": {
+      "endpoint": "/memories/ingest",
+      "method": "POST",
+      "auth": "oauth2"
+    }
+  },
+  "auth": {
+    "type": "oauth2-client-credentials",
+    "token_url": "https://auth.uniquememory.io/oauth/token"
+  },
+  "telemetry": {
+    "latency_ms_budget": 800,
+    "accuracy_threshold": 0.9
+  }
+}

@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: UniqueMemory Public API
+  version: 1.0.0
+  description: |
+    مشخصات OpenAPI برای دسترسی به سرویس حافظه منحصربه‌فرد در انتشار GA.
+servers:
+  - url: https://api.uniquememory.io/v1
+paths:
+  /memories/search:
+    post:
+      summary: جست‌وجوی حافظه هیبریدی
+      operationId: searchMemories
+      security:
+        - oauth2:
+            - memories.read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                companyId:
+                  type: string
+                query:
+                  type: string
+                filters:
+                  type: object
+                  description: فیلترهای اختیاری برای محدودسازی نتایج.
+                  additionalProperties:
+                    type: string
+                  example:
+                    category: compliance
+                    region: EMEA
+              required:
+                - companyId
+                - query
+      responses:
+        '200':
+          description: نتایج جست‌وجو
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latencyMs:
+                    type: integer
+                  hits:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        score:
+                          type: number
+                        snippet:
+                          type: string
+  /memories/ingest:
+    post:
+      summary: بارگذاری داده به حافظه
+      operationId: ingestMemory
+      security:
+        - oauth2:
+            - memories.write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                companyId:
+                  type: string
+                payload:
+                  type: array
+                  description: مجموعه‌ای از اسناد برای بارگذاری در حافظه.
+                  minItems: 1
+                  maxItems: 500
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        description: شناسه یکتا برای هر سند.
+                      content:
+                        type: string
+                        description: متن یا محتوای اصلی سند.
+                      metadata:
+                        type: object
+                        description: ابرداده اختیاری برای تقویت جست‌وجو و ممیزی.
+                        additionalProperties: true
+                    required:
+                      - id
+                      - content
+              required:
+                - companyId
+                - payload
+      responses:
+        '202':
+          description: فرایند ingest پذیرفته شد.
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.uniquememory.io/oauth/token
+          scopes:
+            memories.read: دسترسی خواندن
+            memories.write: دسترسی نوشتن
