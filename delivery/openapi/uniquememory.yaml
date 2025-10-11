@@ -11,6 +11,9 @@ paths:
     post:
       summary: جست‌وجوی حافظه هیبریدی
       operationId: searchMemories
+      security:
+        - oauth2:
+            - memories.read
       requestBody:
         required: true
         content:
@@ -52,6 +55,9 @@ paths:
     post:
       summary: بارگذاری داده به حافظه
       operationId: ingestMemory
+      security:
+        - oauth2:
+            - memories.write
       requestBody:
         required: true
         content:
@@ -81,7 +87,3 @@ components:
           scopes:
             memories.read: دسترسی خواندن
             memories.write: دسترسی نوشتن
-security:
-  - oauth2:
-      - memories.read
-      - memories.write
