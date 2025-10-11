@@ -73,9 +73,10 @@ def memory_search(*, bearer_token: str, payload: dict[str, object]) -> dict[str,
     )
 
     consent = context.consent
+    allowed: list[HybridSearchResult]
     if consent:
         checker = consent.allows_sensitivity
-        allowed: list[HybridSearchResult] = []
+        allowed = []
         for result in raw_results:
             try:
                 is_allowed = checker(result.sensitivity)
@@ -84,7 +85,7 @@ def memory_search(*, bearer_token: str, payload: dict[str, object]) -> dict[str,
             if is_allowed:
                 allowed.append(result)
     else:
-        allowed = []
+        allowed = list(raw_results)
     allowed = allowed[:limit]
 
     if allowed:
