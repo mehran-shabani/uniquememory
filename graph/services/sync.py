@@ -266,7 +266,6 @@ class GraphSyncService:
         connection = transaction.get_connection()
         if connection.in_atomic_block:
             transaction.on_commit(func)
-            func()
         else:
             func()
 
