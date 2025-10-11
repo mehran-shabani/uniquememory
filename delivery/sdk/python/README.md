@@ -1,15 +1,21 @@
 # SDK پایتون UniqueMemory
 
 ## نصب
+
 ```bash
 pip install uniquememory-sdk==1.0.0
 ```
 
 ## نمونه استفاده
+
 ```python
+import os
 from uniquememory import Client
 
-client = Client(client_id="<CLIENT_ID>", client_secret="<CLIENT_SECRET>")
+client = Client(
+    client_id=os.environ.get("CLIENT_ID"),
+    client_secret=os.environ.get("CLIENT_SECRET"),
+)
 
 results = client.search(company_id="alpha-tech", query="chargeback investigation")
 print(results.latency_ms, len(results.hits))

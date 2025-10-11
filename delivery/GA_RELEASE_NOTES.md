@@ -4,6 +4,7 @@
 1. اطمینان از به‌روزرسانی همه اقلام در `delivery/` و اجرای تست‌های نهایی.
 2. افزایش نسخه در بسته‌های SDK و فایل‌های OpenAPI/Manifest در صورت نیاز.
 3. اجرای دستور زیر برای ساخت تگ:
+
    ```bash
    git tag -a v1.0.0 -m "UniqueMemory GA"
    git push origin v1.0.0

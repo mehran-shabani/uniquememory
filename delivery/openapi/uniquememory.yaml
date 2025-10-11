@@ -27,6 +27,12 @@ paths:
                   type: string
                 filters:
                   type: object
+                  description: فیلترهای اختیاری برای محدودسازی نتایج.
+                  additionalProperties:
+                    type: string
+                  example:
+                    category: compliance
+                    region: EMEA
               required:
                 - companyId
                 - query
@@ -42,6 +48,7 @@ paths:
                     type: integer
                   hits:
                     type: array
+                    maxItems: 100
                     items:
                       type: object
                       properties:
@@ -69,8 +76,25 @@ paths:
                   type: string
                 payload:
                   type: array
+                  description: مجموعه‌ای از اسناد برای بارگذاری در حافظه.
+                  minItems: 1
+                  maxItems: 500
                   items:
                     type: object
+                    properties:
+                      id:
+                        type: string
+                        description: شناسه یکتا برای هر سند.
+                      content:
+                        type: string
+                        description: متن یا محتوای اصلی سند.
+                      metadata:
+                        type: object
+                        description: ابرداده اختیاری برای تقویت جست‌وجو و ممیزی.
+                        additionalProperties: true
+                    required:
+                      - id
+                      - content
               required:
                 - companyId
                 - payload

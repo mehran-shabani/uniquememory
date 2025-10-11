@@ -14,9 +14,10 @@
 - ممیزی جامع با نگهداری 365 روزه و هش زنجیره‌ای.
 
 ## مانیتورینگ و پاسخ به رخداد
+
 - جمع‌آوری لاگ با OpenTelemetry و ارسال به SIEM مرکزی.
 - آستانه‌های Alert برای Latency، نرخ خطای 5xx و رویدادهای دسترسی پرریسک.
-- Runbook واکنش به رخداد در `docs/runbooks/security-incident.md` مستند شده است.
+- Runbook واکنش به رخداد در [docs/runbooks/security-incident.md](../../docs/runbooks/security-incident.md) مستند شده است.
 
 ## انطباق
 - همسویی با SOC2 Type II و HIPAA برای شرکای سلامت.
