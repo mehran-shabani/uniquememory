@@ -34,21 +34,19 @@ class MemoryQueryView(View):
         try:
             payload = json.loads(request.body.decode() or "{}")
         except json.JSONDecodeError:
-            return HttpResponseBadRequest(sanitize_text("Invalid JSON payload."))
+            return HttpResponseBadRequest("Invalid JSON payload.")
 
         query = payload.get("query")
         if not isinstance(query, str) or not query.strip():
-            return HttpResponseBadRequest(sanitize_text("Query text is required."))
+            return HttpResponseBadRequest("Query text is required.")
 
         limit = payload.get("limit", 10)
         if not isinstance(limit, int) or limit <= 0:
-            return HttpResponseBadRequest(
-                sanitize_text("Limit must be a positive integer.")
-            )
+            return HttpResponseBadRequest("Limit must be a positive integer.")
 
         agent_identifier = request.headers.get("X-Agent-ID")
         if not agent_identifier:
-            return HttpResponse(sanitize_text("Missing X-Agent-ID header."), status=403)
+            return HttpResponse("Missing X-Agent-ID header.", status=403)
         try:
             self.policy_engine.enforce(
                 subject=user,

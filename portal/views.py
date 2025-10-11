@@ -40,7 +40,7 @@ class ConsentManagementView(LoginRequiredMixin, TemplateView):
             else:
                 messages.error(
                     request,
-                    sanitize_text("Unable to revoke consent. Please try again."),
+                    "Unable to revoke consent. Please try again.",
                 )
             return redirect("portal:consents")
 
@@ -53,6 +53,6 @@ class ConsentManagementView(LoginRequiredMixin, TemplateView):
             )
             return redirect("portal:consents")
 
-        messages.error(request, sanitize_text("Please correct the errors below."))
+        messages.error(request, "Please correct the errors below.")
         context = self.get_context_data(grant_form=form)
         return self.render_to_response(context)

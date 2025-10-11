@@ -8,10 +8,10 @@ from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 _DEFAULT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # Social security numbers (US-style)
     (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[REDACTED-SSN]"),
-    # Credit card numbers (continuous digits)
-    (re.compile(r"\b\d{16}\b"), "[REDACTED-PAN]"),
-    # Credit card numbers grouped in fours
-    (re.compile(r"\b(?:\d{4}[- ]){3}\d{4}\b"), "[REDACTED-PAN]"),
+    # Credit card numbers (13–19 contiguous digits)
+    (re.compile(r"\b\d{13,19}\b"), "[REDACTED-PAN]"),
+    # Credit card numbers with optional single separators
+    (re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)"), "[REDACTED-PAN]"),
     # Email addresses
     (re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE), "[REDACTED-EMAIL]"),
     # Phone numbers with separators
@@ -51,7 +51,7 @@ class DLPSanitizer:
         key_substrings: Iterable[str] | None = None,
     ) -> None:
         self.patterns = tuple(patterns) if patterns is not None else _DEFAULT_PATTERNS
-        self.key_blocklist = tuple(k.lower() for k in (key_blocklist or _KEY_BLOCKLIST))
+        self.key_blocklist = {k.lower() for k in (key_blocklist or _KEY_BLOCKLIST)}
         self.key_substrings = tuple(s.lower() for s in (key_substrings or _KEY_SUBSTRINGS))
 
     def sanitize(self, payload: Any) -> Any:
@@ -93,8 +93,6 @@ class DLPSanitizer:
             return self._sanitize_mapping(payload)
         if isinstance(payload, Sequence) and not isinstance(payload, (str, bytes, bytearray)):
             return self._sanitize_sequence(payload)
-        if isinstance(payload, bytes):
-            return payload
         return payload
 
 

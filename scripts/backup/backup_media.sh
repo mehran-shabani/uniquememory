@@ -3,6 +3,8 @@ set -euo pipefail
 
 : "${BACKUP_PASSPHRASE:?Environment variable BACKUP_PASSPHRASE must be set}"
 
+umask "${BACKUP_UMASK:-077}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 MEDIA_ROOT="${MEDIA_ROOT:-${PROJECT_ROOT}/media}"
