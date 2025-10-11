@@ -12,7 +12,6 @@ from memory.services.query import HybridQueryService, HybridSearchResult
 
 from ..auth import BearerTokenValidator
 
-
 validator = BearerTokenValidator()
 query_service = HybridQueryService()
 
@@ -54,7 +53,8 @@ def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     )
 
     allowed: List[HybridSearchResult] = [
-        result for result in raw_results
+        result
+        for result in raw_results
         if context.consent and context.consent.allows_sensitivity(result.sensitivity)
     ]
     allowed = allowed[:limit]
@@ -135,7 +135,7 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
             title=title,
             content=content,
             sensitivity=sensitivity,
-            entry_type=entry_type,
+            entry_type=validated_entry_type or MemoryEntry.TYPE_NOTE,
         )
         return {"entry_id": entry.pk, "version": entry.version}
 
@@ -180,6 +180,11 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
 
         for field, value in updates.items():
             setattr(entry, field, value)
+        if requested_sensitivity is not None:
+            entry.sensitivity = requested_sensitivity
+        if validated_entry_type is not None:
+            entry.entry_type = validated_entry_type
+
         entry.version = expected_version + 1
         entry.save(update_fields=[*updates.keys(), "version", "updated_at"])
 

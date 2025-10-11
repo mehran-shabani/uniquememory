@@ -1,0 +1,31 @@
+name: "Chore"
+description: "Track maintenance or operational work"
+labels: ["chore"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the maintenance task.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Provide additional context, linked issues, or notes.
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Task checklist
+      description: Break the work into actionable steps.
+      placeholder: |
+        - [ ] Step one
+        - [ ] Step two
+  - type: checkboxes
+    id: compliance
+    attributes:
+      label: Compliance & documentation
+      options:
+        - label: Update runbooks or operational docs
+        - label: Notify stakeholders when complete
