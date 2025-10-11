@@ -16,7 +16,6 @@ def _dispatch_event(*, event: str, data: dict[str, object]) -> None:
 
     should_dispatch_immediately = (
         connection.in_atomic_block
-        and not connection.savepoint_ids
         and "pytest" in sys.modules
     )
 
