@@ -92,9 +92,15 @@ class HybridQueryService:
         return f"{CACHE_NAMESPACE}:{user_id}:{limit}:{hash(query)}"
 
     def _ensure_fts_index(self) -> None:
-        if not MemoryEntry.objects.exists():
-            return
-
+        with connections["default"].cursor() as cursor:
+            cursor.execute(
+                f"CREATE VIRTUAL TABLE IF NOT EXISTS {self.fts_table} USING fts5(title, content)"
+            )
+            if not MemoryEntry.objects.exists():
+                return
+            cursor.execute(
+                f"SELECT 1"
+            )
         with connections["default"].cursor() as cursor:
             cursor.execute(
                 f"CREATE VIRTUAL TABLE IF NOT EXISTS {self.fts_table} USING fts5(title, content)"
