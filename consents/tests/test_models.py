@@ -18,12 +18,12 @@ class TestConsentModel:
 
     def _create_valid_consent(self, **overrides: Any) -> Consent:
         data: dict[str, Any] = {
-            user=self.user,
-            agent_identifier=self.agent_identifier,
-            scopes=[SCOPE_MEMORY_READ],
-            sensitivity_levels=[MemoryEntry.SENSITIVITY_PUBLIC],
-            status=Consent.STATUS_PENDING,
-            version=1,
+            "user": self.user,
+            "agent_identifier": self.agent_identifier,
+            "scopes": [SCOPE_MEMORY_READ],
+            "sensitivity_levels": [MemoryEntry.SENSITIVITY_PUBLIC],
+            "status": Consent.STATUS_PENDING,
+            "version": 1,
         }
         data.update(overrides)
         return Consent.objects.create(**data)

@@ -41,29 +41,19 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
 
       - name: Run tests
-        run: pytest
-
-      - name: Build coverage artifacts
-        if: always()
-        id: coverage
-        run: |
-          if [ -f .coverage ]; then
-            coverage xml
-            coverage html
-            echo "generated=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "generated=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: >-
+          pytest --cov --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
+          --cov-report=html:htmlcov
 
       - name: Verify Python files compile
         run: python -m compileall .
 
       - name: Upload coverage reports
-        if: steps.coverage.outputs.generated == 'true'
+        if: hashFiles('coverage.xml') != ''
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python-version }}
           path: |
             coverage.xml
-            htmlcov
+            htmlcov/
           if-no-files-found: warn

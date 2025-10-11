@@ -14,12 +14,10 @@ class WebhookSubscriptionQuerySet(models.QuerySet):
     def for_event(self, event_name: str) -> "WebhookSubscriptionQuerySet":
         if connection.vendor == "sqlite":
             matching_ids = [
-                subscription.pk
-                for subscription in self
-                if event_name in (subscription.events or [])
+                pk
+                for pk, events in self.values_list("pk", "events")
+                if event_name in (events or [])
             ]
-            if not matching_ids:
-                return self.none()
             return self.filter(pk__in=matching_ids)
         return self.filter(events__contains=[event_name])
 
