@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List
+from collections.abc import Iterable
+from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
@@ -32,7 +33,7 @@ class HybridSearchResult:
     sensitivity: str
     entry_type: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "id": self.entry_id,
             "title": self.title,
@@ -47,7 +48,7 @@ class HybridSearchResult:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "HybridSearchResult":
+    def from_dict(cls, data: dict[str, object]) -> "HybridSearchResult":
         return cls(
             entry_id=data["id"],
             title=data["title"],
@@ -68,7 +69,7 @@ class HybridQueryService:
     cache_timeout: int = 120
     fts_table: str = "memory_memoryentry_fts"
 
-    def search(self, *, user_id: str, query: str, limit: int = 10) -> List[HybridSearchResult]:
+    def search(self, *, user_id: str, query: str, limit: int = 10) -> list[HybridSearchResult]:
         normalized_query = (query or "").strip()
         if not normalized_query:
             return []
@@ -91,13 +92,13 @@ class HybridQueryService:
         return f"{CACHE_NAMESPACE}:{user_id}:{limit}:{hash(query)}"
 
     def _ensure_fts_index(self) -> None:
+        if not MemoryEntry.objects.exists():
+            return
+
         with connections["default"].cursor() as cursor:
             cursor.execute(
                 f"CREATE VIRTUAL TABLE IF NOT EXISTS {self.fts_table} USING fts5(title, content)"
             )
-            entries = MemoryEntry.objects.count()
-            if entries == 0:
-                return
             latest_update = MemoryEntry.objects.aggregate(max_updated=Max("updated_at"))["max_updated"]
             marker_key = f"{CACHE_NAMESPACE}:fts-version"
             marker = cache.get(marker_key)
@@ -125,8 +126,8 @@ class HybridQueryService:
             return query
         return " ".join(f"{term}*" for term in terms)
 
-    def _text_search(self, query: str, *, limit: int) -> Dict[int, float]:
-        scores: Dict[int, float] = {}
+    def _text_search(self, query: str, *, limit: int) -> dict[int, float]:
+        scores: dict[int, float] = {}
         if not query:
             return scores
         fts_query = self._prepare_fts_query(query)
@@ -145,8 +146,8 @@ class HybridQueryService:
                 scores[int(rowid)] = normalized
         return scores
 
-    def _vector_search(self, query_vector: Iterable[float], *, limit: int) -> Dict[int, float]:
-        results: Dict[int, float] = {}
+    def _vector_search(self, query_vector: Iterable[float], *, limit: int) -> dict[int, float]:
+        results: dict[int, float] = {}
         vectors = list(query_vector)
         if not vectors:
             return results
@@ -167,10 +168,10 @@ class HybridQueryService:
 
     def _combine_scores(
         self,
-        text_scores: Dict[int, float],
-        vector_scores: Dict[int, float],
+        text_scores: dict[int, float],
+        vector_scores: dict[int, float],
         limit: int,
-    ) -> List[HybridSearchResult]:
+    ) -> list[HybridSearchResult]:
         entry_ids = set(text_scores) | set(vector_scores)
         if not entry_ids:
             return []
@@ -184,12 +185,9 @@ class HybridQueryService:
 
         combined.sort(key=lambda item: (item[1], item[2], item[3]), reverse=True)
         selected_ids = [entry_id for entry_id, *_ in combined[:limit]]
-        entries = {
-            entry.id: entry
-            for entry in MemoryEntry.objects.filter(id__in=selected_ids)
-        }
+        entries = {entry.id: entry for entry in MemoryEntry.objects.filter(id__in=selected_ids)}
 
-        results: List[HybridSearchResult] = []
+        results: list[HybridSearchResult] = []
         for entry_id, combined_score, text_score, vector_score in combined:
             if entry_id not in entries:
                 continue
@@ -211,7 +209,7 @@ class HybridQueryService:
                 break
         return results
 
-    def _encode_query(self, query: str) -> List[float]:
+    def _encode_query(self, query: str) -> list[float]:
         backend = self._embedding_backend
         encoded = backend.encode([query], batch_size=1, convert_to_numpy=False)
         if isinstance(encoded, list):

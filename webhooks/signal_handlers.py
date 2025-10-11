@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Type
+from typing import Any
 
 from django.db import transaction
 from django.dispatch import receiver
@@ -33,7 +33,7 @@ def _dispatch_event(*, event: str, data: dict[str, object]) -> None:
 
 
 @receiver(memory_signals.entry_created)
-def handle_entry_created(sender: Type[MemoryEntry], entry: MemoryEntry, **_kwargs: Any) -> None:
+def handle_entry_created(sender: type[MemoryEntry], entry: MemoryEntry, **_kwargs: Any) -> None:
     data = {
         "entry_id": entry.pk,
         "title": entry.title,
@@ -45,7 +45,7 @@ def handle_entry_created(sender: Type[MemoryEntry], entry: MemoryEntry, **_kwarg
 
 
 @receiver(memory_signals.entry_updated)
-def handle_entry_updated(sender: Type[MemoryEntry], entry: MemoryEntry, **_kwargs: Any) -> None:
+def handle_entry_updated(sender: type[MemoryEntry], entry: MemoryEntry, **_kwargs: Any) -> None:
     data = {
         "entry_id": entry.pk,
         "title": entry.title,
@@ -57,7 +57,7 @@ def handle_entry_updated(sender: Type[MemoryEntry], entry: MemoryEntry, **_kwarg
 
 
 @receiver(memory_signals.entry_deleted)
-def handle_entry_deleted(sender: Type[MemoryEntry], entry_id: int, **_kwargs: Any) -> None:
+def handle_entry_deleted(sender: type[MemoryEntry], entry_id: int, **_kwargs: Any) -> None:
     data = {
         "entry_id": entry_id,
     }
@@ -66,7 +66,7 @@ def handle_entry_deleted(sender: Type[MemoryEntry], entry_id: int, **_kwargs: An
 
 
 @receiver(consent_signals.consent_created)
-def handle_consent_created(sender: Type[Consent], consent: Consent, **_kwargs: Any) -> None:
+def handle_consent_created(sender: type[Consent], consent: Consent, **_kwargs: Any) -> None:
     data = {
         "consent_id": consent.pk,
         "user_id": str(consent.user_id),
@@ -78,7 +78,7 @@ def handle_consent_created(sender: Type[Consent], consent: Consent, **_kwargs: A
 
 
 @receiver(consent_signals.consent_revoked)
-def handle_consent_revoked(sender: Type[Consent], consent: Consent, **_kwargs: Any) -> None:
+def handle_consent_revoked(sender: type[Consent], consent: Consent, **_kwargs: Any) -> None:
     data = {
         "consent_id": consent.pk,
         "user_id": str(consent.user_id),
