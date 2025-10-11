@@ -118,7 +118,7 @@ class GraphSyncService:
 
         self._on_commit(sync)
 
-    def _handle_consent_deleted(self, sender, instance: Consent, **_kwargs: Any) -> None:
+    def _handle_consent_deleted(self, sender: type[Consent], instance: Consent, **_kwargs: Any) -> None:
         def sync() -> None:
             GraphNode.objects.filter(
                 node_type=self.consent_node_type,
