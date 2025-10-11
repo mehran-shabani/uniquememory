@@ -43,6 +43,14 @@ jobs:
       - name: Run tests
         run: pytest
 
+      - name: Build coverage artifacts
+        if: always()
+        run: |
+          if [ -f .coverage ]; then
+            coverage xml
+            coverage html
+          fi
+
       - name: Verify Python files compile
         run: python -m compileall .
 
