@@ -53,7 +53,10 @@ def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     if not isinstance(query, str) or not query.strip():
         raise PermissionDenied(SEARCH_QUERY_REQUIRED_ERROR)
 
-    limit = payload.get("limit") or payload.get("k") or 10
+    limit_value = payload.get("limit")
+    if limit_value is None:
+        limit_value = payload.get("k")
+    limit = limit_value if limit_value is not None else 10
     if not isinstance(limit, int) or limit <= 0:
         raise PermissionDenied(LIMIT_POSITIVE_INT_ERROR)
 
@@ -72,11 +75,16 @@ def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         limit=limit,
     )
 
-    allowed: List[HybridSearchResult] = [
-        result
-        for result in raw_results
-        if context.consent and context.consent.allows_sensitivity(result.sensitivity)
-    ]
+    consent = context.consent
+    if consent:
+        allows_sensitivity = type(consent).allows_sensitivity
+        allowed: List[HybridSearchResult] = [
+            result
+            for result in raw_results
+            if allows_sensitivity(consent, result.sensitivity)
+        ]
+    else:
+        allowed = []
     allowed = allowed[:limit]
 
     if allowed:

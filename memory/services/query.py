@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List
 
 from django.conf import settings
 from django.core.cache import cache
@@ -12,6 +12,11 @@ from django.utils.functional import cached_property
 
 from embeddings.models import Embedding
 from memory.models import MemoryEntry
+
+try:  # pragma: no cover - optional dependency for production environments
+    from sentence_transformers import SentenceTransformer  # type: ignore[import]
+except ImportError:  # pragma: no cover - dependency guard
+    SentenceTransformer = None  # type: ignore[assignment]
 
 CACHE_NAMESPACE = "memory-hybrid-query"
 
@@ -86,13 +91,13 @@ class HybridQueryService:
         return f"{CACHE_NAMESPACE}:{user_id}:{limit}:{hash(query)}"
 
     def _ensure_fts_index(self) -> None:
-        entries = MemoryEntry.objects.count()
-        if entries == 0:
-            return
         with connections["default"].cursor() as cursor:
             cursor.execute(
                 f"CREATE VIRTUAL TABLE IF NOT EXISTS {self.fts_table} USING fts5(title, content)"
             )
+            entries = MemoryEntry.objects.count()
+            if entries == 0:
+                return
             latest_update = MemoryEntry.objects.aggregate(max_updated=Max("updated_at"))["max_updated"]
             marker_key = f"{CACHE_NAMESPACE}:fts-version"
             marker = cache.get(marker_key)
@@ -210,10 +215,19 @@ class HybridQueryService:
         backend = self._embedding_backend
         encoded = backend.encode([query], batch_size=1, convert_to_numpy=False)
         if isinstance(encoded, list):
-            vector = encoded[0]
+            vector: Any = encoded[0]
         else:  # numpy array like
-            vector = encoded[0].tolist()
-        return [float(value) for value in vector]
+            vector = encoded[0]
+        if hasattr(vector, "tolist"):
+            values = vector.tolist()
+        elif isinstance(vector, (list, tuple)):
+            values = vector
+        else:
+            try:
+                values = list(vector)
+            except TypeError:
+                values = [vector]
+        return [float(value) for value in values]
 
     @cached_property
     def _embedding_backend(self):
@@ -223,12 +237,10 @@ class HybridQueryService:
 
             backend_factory = import_string(backend_path)
             return backend_factory()
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError as exc:  # pragma: no cover - dependency guard
+        if SentenceTransformer is None:
             raise RuntimeError(
                 "sentence-transformers package is required for embedding queries."
-            ) from exc
+            )
         model_name = getattr(settings, "EMBEDDINGS_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
         return SentenceTransformer(model_name)
 
