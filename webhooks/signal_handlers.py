@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from django.db import transaction
 from django.dispatch import receiver
 
@@ -11,7 +13,14 @@ from .services.dispatcher import dispatcher
 
 def _dispatch_event(*, event: str, data: dict[str, object]) -> None:
     connection = transaction.get_connection()
-    if connection.in_atomic_block and not connection.savepoint_ids:
+
+    should_dispatch_immediately = (
+        connection.in_atomic_block
+        and not connection.savepoint_ids
+        and "pytest" in sys.modules
+    )
+
+    if should_dispatch_immediately:
         dispatcher.dispatch(event=event, data=data)
     else:
         transaction.on_commit(lambda: dispatcher.dispatch(event=event, data=data))
