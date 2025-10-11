@@ -92,39 +92,38 @@ class HybridQueryService:
         return f"{CACHE_NAMESPACE}:{user_id}:{limit}:{hash(query)}"
 
     def _ensure_fts_index(self) -> None:
+        if not MemoryEntry.objects.exists():
+            return
+
+        latest_update = MemoryEntry.objects.aggregate(max_updated=Max("updated_at"))["max_updated"]
+        marker_key = f"{CACHE_NAMESPACE}:fts-version"
+        marker = cache.get(marker_key)
+
         with connections["default"].cursor() as cursor:
             cursor.execute(
                 f"CREATE VIRTUAL TABLE IF NOT EXISTS {self.fts_table} USING fts5(title, content)"
             )
-            if not MemoryEntry.objects.exists():
+
+            if marker == latest_update:
                 return
-            cursor.execute(
-                f"SELECT 1"
-            )
-        with connections["default"].cursor() as cursor:
-            cursor.execute(
-                f"CREATE VIRTUAL TABLE IF NOT EXISTS {self.fts_table} USING fts5(title, content)"
-            )
-            latest_update = MemoryEntry.objects.aggregate(max_updated=Max("updated_at"))["max_updated"]
-            marker_key = f"{CACHE_NAMESPACE}:fts-version"
-            marker = cache.get(marker_key)
-            if marker != latest_update:
-                cursor.execute(f"DELETE FROM {self.fts_table}")
-                values = MemoryEntry.objects.values_list("id", "title", "content")
-                rows = [
-                    (
-                        entry_id,
-                        title or "",
-                        content or "",
-                    )
-                    for entry_id, title, content in values
-                ]
-                if rows:
-                    cursor.executemany(
-                        f"INSERT INTO {self.fts_table}(rowid, title, content) VALUES (?, ?, ?)",
-                        rows,
-                    )
-                cache.set(marker_key, latest_update, timeout=self.cache_timeout)
+
+            cursor.execute(f"DELETE FROM {self.fts_table}")
+            values = MemoryEntry.objects.values_list("id", "title", "content")
+            rows = [
+                (
+                    entry_id,
+                    title or "",
+                    content or "",
+                )
+                for entry_id, title, content in values
+            ]
+            if rows:
+                cursor.executemany(
+                    f"INSERT INTO {self.fts_table}(rowid, title, content) VALUES (?, ?, ?)",
+                    rows,
+                )
+
+        cache.set(marker_key, latest_update, timeout=self.cache_timeout)
 
     def _prepare_fts_query(self, query: str) -> str:
         terms = [term.strip() for term in query.split() if term.strip()]
