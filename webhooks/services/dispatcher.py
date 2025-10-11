@@ -11,6 +11,14 @@ from django.utils import timezone
 
 from webhooks.models import WebhookSubscription
 
+EVENT_REQUIRED_FIELDS: dict[str, set[str]] = {
+    "memory.entry.created": {"entry_id"},
+    "memory.entry.updated": {"entry_id"},
+    "memory.entry.deleted": {"entry_id"},
+    "consent.created": {"consent_id", "agent_identifier"},
+    "consent.revoked": {"consent_id", "agent_identifier"},
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,6 +31,15 @@ class WebhookDispatcher:
     def dispatch(self, *, event: str, data: dict[str, Any]) -> None:
         subscriptions = WebhookSubscription.objects.active().for_event(event)
         for subscription in subscriptions:
+            if not self._event_has_required_fields(event, data):
+                logger.debug(
+                    "Skipping webhook dispatch due to incomplete payload",
+                    extra={
+                        "event": event,
+                        "subscription_id": subscription.pk,
+                    },
+                )
+                continue
             payload = self._build_payload(event=event, data=data)
             try:
                 self._deliver(subscription, payload)
@@ -56,6 +73,13 @@ class WebhookDispatcher:
         signed_payload = dict(payload)
         signed_payload["signature"] = signature
         return signed_payload
+
+    def _event_has_required_fields(self, event: str, data: dict[str, Any]) -> bool:
+        required = EVENT_REQUIRED_FIELDS.get(event)
+        if not required:
+            return True
+        present = {key for key in data if data.get(key) is not None}
+        return required.issubset(present)
 
 
 dispatcher = WebhookDispatcher()

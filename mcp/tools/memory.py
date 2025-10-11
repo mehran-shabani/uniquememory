@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Dict, List
-
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 
@@ -36,7 +33,7 @@ LIMIT_POSITIVE_INT_ERROR = "Limit must be a positive integer."
 UNAUTHORIZED_SEARCH_ERROR = "Searching on behalf of another user is not permitted."
 
 
-def _serialize_entry(entry: MemoryEntry) -> Dict[str, object]:
+def _serialize_entry(entry: MemoryEntry) -> dict[str, object]:
     return {
         "id": entry.pk,
         "title": entry.title,
@@ -48,12 +45,15 @@ def _serialize_entry(entry: MemoryEntry) -> Dict[str, object]:
     }
 
 
-def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, object]:
+def memory_search(*, bearer_token: str, payload: dict[str, object]) -> dict[str, object]:
     query = payload.get("query") or payload.get("q")
     if not isinstance(query, str) or not query.strip():
         raise PermissionDenied(SEARCH_QUERY_REQUIRED_ERROR)
 
-    limit = payload.get("limit") or payload.get("k") or 10
+    limit_value = payload.get("limit")
+    if limit_value is None:
+        limit_value = payload.get("k")
+    limit = limit_value if limit_value is not None else 10
     if not isinstance(limit, int) or limit <= 0:
         raise PermissionDenied(LIMIT_POSITIVE_INT_ERROR)
 
@@ -72,11 +72,15 @@ def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         limit=limit,
     )
 
-    allowed: List[HybridSearchResult] = [
-        result
-        for result in raw_results
-        if context.consent and context.consent.allows_sensitivity(result.sensitivity)
-    ]
+    consent = context.consent
+    allowed: list[HybridSearchResult]
+    if consent:
+        allowed = []
+        for result in raw_results:
+            if consent.allows_sensitivity(result.sensitivity):
+                allowed.append(result)
+    else:
+        allowed = list(raw_results)
     allowed = allowed[:limit]
 
     if allowed:
@@ -93,7 +97,7 @@ def memory_search(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     }
 
 
-def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, object]:
+def memory_get(*, bearer_token: str, payload: dict[str, object]) -> dict[str, object]:
     entry_id = payload.get("entry_id") or payload.get("id")
     if not isinstance(entry_id, int):
         raise PermissionDenied(ENTRY_ID_REQUIRED_ERROR)
@@ -112,14 +116,14 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
 
     return {"entry": _serialize_entry(entry)}
 
-def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, object]:
+def memory_upsert(*, bearer_token: str, payload: dict[str, object]) -> dict[str, object]:
     entry_payload_obj = payload.get("entry") if isinstance(payload, dict) else None
     if entry_payload_obj is None:
         entry_payload_obj = payload
     if not isinstance(entry_payload_obj, dict):
         raise PermissionDenied(ENTRY_PAYLOAD_TYPE_ERROR)
 
-    entry_payload: Dict[str, object] = entry_payload_obj
+    entry_payload: dict[str, object] = entry_payload_obj
     entry_id = entry_payload.get("entry_id") or entry_payload.get("id")
 
     requested_sensitivity = entry_payload.get("sensitivity")
@@ -197,7 +201,7 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
 
         if entry.version != expected_version:
             raise PermissionDenied(VERSION_CONFLICT_ERROR)
-        updates: Dict[str, object] = {}
+        updates: dict[str, object] = {}
 
         if "title" in entry_payload:
             title = entry_payload["title"]
@@ -230,7 +234,7 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     return {"entry_id": entry.pk, "version": entry.version}
 
 
-def memory_delete(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, object]:
+def memory_delete(*, bearer_token: str, payload: dict[str, object]) -> dict[str, object]:
     entry_id = payload.get("entry_id") or payload.get("id")
     if not isinstance(entry_id, int):
         raise PermissionDenied(ENTRY_ID_REQUIRED_ERROR)
