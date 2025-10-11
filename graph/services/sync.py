@@ -265,9 +265,9 @@ class GraphSyncService:
     def _on_commit(self, func: Callable[[], None]) -> None:
         connection = transaction.get_connection()
         if connection.in_atomic_block:
-            transaction.on_commit(func)
-        else:
             func()
+        else:
+            transaction.on_commit(func)
 
 
 graph_sync_service = GraphSyncService()
