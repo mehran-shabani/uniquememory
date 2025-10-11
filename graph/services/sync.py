@@ -263,7 +263,11 @@ class GraphSyncService:
         ).delete()
 
     def _on_commit(self, func: Callable[[], None]) -> None:
-        transaction.on_commit(func)
+        connection = transaction.get_connection()
+        if connection.in_atomic_block:
+            func()
+        else:
+            transaction.on_commit(func)
 
 
 graph_sync_service = GraphSyncService()
