@@ -84,7 +84,7 @@ class GraphSyncService:
 
         self._on_commit(sync)
 
-    def _handle_consent_saved(self, sender, instance: Consent, **_kwargs: Any) -> None:
+    def _handle_consent_saved(self, sender: type[Consent], instance: Consent, _created: bool, **_kwargs: Any) -> None:
         def sync() -> None:
             metadata = {
                 "status": instance.status,
