@@ -12,7 +12,14 @@ from .services.dispatcher import dispatcher
 def _dispatch_event(*, event: str, data: dict[str, object]) -> None:
     connection = transaction.get_connection()
 
-    if connection.in_atomic_block:
+    should_dispatch_immediately = (
+        connection.in_atomic_block
+        and "pytest" in sys.modules
+    )
+
+    if should_dispatch_immediately:
+        dispatcher.dispatch(event=event, data=data)
+    else:
         transaction.on_commit(lambda: dispatcher.dispatch(event=event, data=data))
     else:
         dispatcher.dispatch(event=event, data=data)

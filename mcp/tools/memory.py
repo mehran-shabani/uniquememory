@@ -106,12 +106,10 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     if requested_sensitivity is not None and not isinstance(requested_sensitivity, str):
         raise PermissionDenied("sensitivity must be a string.")
 
-    validated_sensitivity: str | None = None
-    if requested_sensitivity is not None:
-        allowed_sensitivities = {choice for choice, _ in MemoryEntry.SENSITIVITY_CHOICES}
-        if requested_sensitivity not in allowed_sensitivities:
-            raise PermissionDenied("sensitivity is invalid.")
-        validated_sensitivity = requested_sensitivity
+    if requested_sensitivity is not None and requested_sensitivity not in {
+        choice for choice, _label in MemoryEntry.SENSITIVITY_CHOICES
+    }:
+        raise PermissionDenied("sensitivity must be one of the supported values.")
 
     entry_type = entry_payload.get("entry_type")
     if entry_type is not None and not isinstance(entry_type, str):
@@ -119,9 +117,9 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
 
     validated_entry_type: str | None = None
     if entry_type is not None:
-        allowed_entry_types = {choice for choice, _ in MemoryEntry.TYPE_CHOICES}
-        if entry_type not in allowed_entry_types:
-            raise PermissionDenied("entry_type is invalid.")
+        valid_entry_types = {choice for choice, _label in MemoryEntry.TYPE_CHOICES}
+        if entry_type not in valid_entry_types:
+            raise PermissionDenied("entry_type must be one of the supported values.")
         validated_entry_type = entry_type
 
     context = validator.parse(
@@ -202,8 +200,13 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         elif "entry_type" in entry_payload:
             raise PermissionDenied("entry_type must be a valid string.")
 
+        if validated_entry_type is not None:
+            updates["entry_type"] = validated_entry_type
+
         for field, value in updates.items():
             setattr(entry, field, value)
+        if requested_sensitivity is not None:
+            entry.sensitivity = requested_sensitivity
 
         entry.version = expected_version + 1
         entry.save(update_fields=[*updates.keys(), "version", "updated_at"])
