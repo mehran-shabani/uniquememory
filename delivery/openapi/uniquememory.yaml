@@ -1,0 +1,87 @@
+openapi: 3.1.0
+info:
+  title: UniqueMemory Public API
+  version: 1.0.0
+  description: |
+    مشخصات OpenAPI برای دسترسی به سرویس حافظه منحصربه‌فرد در انتشار GA.
+servers:
+  - url: https://api.uniquememory.io/v1
+paths:
+  /memories/search:
+    post:
+      summary: جست‌وجوی حافظه هیبریدی
+      operationId: searchMemories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                companyId:
+                  type: string
+                query:
+                  type: string
+                filters:
+                  type: object
+              required:
+                - companyId
+                - query
+      responses:
+        '200':
+          description: نتایج جست‌وجو
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latencyMs:
+                    type: integer
+                  hits:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        score:
+                          type: number
+                        snippet:
+                          type: string
+  /memories/ingest:
+    post:
+      summary: بارگذاری داده به حافظه
+      operationId: ingestMemory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                companyId:
+                  type: string
+                payload:
+                  type: array
+                  items:
+                    type: object
+              required:
+                - companyId
+                - payload
+      responses:
+        '202':
+          description: فرایند ingest پذیرفته شد.
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.uniquememory.io/oauth/token
+          scopes:
+            memories.read: دسترسی خواندن
+            memories.write: دسترسی نوشتن
+security:
+  - oauth2:
+      - memories.read
+      - memories.write
