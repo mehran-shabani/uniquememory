@@ -16,7 +16,6 @@ def _dispatch_event(event: str, data: dict[str, object]) -> None:
     connection = transaction.get_connection()
     if connection.in_atomic_block:
         transaction.on_commit(callback)
-        callback()
     else:
         callback()
 
