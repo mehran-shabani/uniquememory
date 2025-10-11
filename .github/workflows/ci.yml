@@ -55,7 +55,7 @@ jobs:
         run: python -m compileall .
 
       - name: Upload coverage reports
-        if: always()
+        if: always() && hashFiles('coverage.xml') != ''
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python-version }}
