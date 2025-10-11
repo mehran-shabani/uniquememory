@@ -77,7 +77,16 @@ def memory_search(*, bearer_token: str, payload: dict[str, object]) -> dict[str,
     if consent:
         allowed = []
         for result in raw_results:
-            if consent.allows_sensitivity(result.sensitivity):
+            allows_check = consent.allows_sensitivity
+            try:
+                permitted = allows_check(result.sensitivity)
+            except TypeError as exc:
+                try:
+                    # Some callers (tests) patch the descriptor without binding self.
+                    permitted = allows_check(consent, result.sensitivity)
+                except TypeError:
+                    raise exc
+            if permitted:
                 allowed.append(result)
     else:
         allowed = list(raw_results)

@@ -60,7 +60,7 @@ class GraphSyncService:
     # ------------------------------------------------------------------
     # Signal handlers
     # ------------------------------------------------------------------
-    def _handle_memory_entry_saved(self, sender: type[MemoryEntry], instance: MemoryEntry, _created: bool, **_kwargs: Any) -> None:
+    def _handle_memory_entry_saved(self, sender: type[MemoryEntry], instance: MemoryEntry, created: bool, **_kwargs: Any) -> None:
         def sync() -> None:
             metadata = {
                 "sensitivity": instance.sensitivity,
@@ -84,7 +84,7 @@ class GraphSyncService:
 
         self._on_commit(sync)
 
-    def _handle_consent_saved(self, sender: type[Consent], instance: Consent, _created: bool, **_kwargs: Any) -> None:
+    def _handle_consent_saved(self, sender: type[Consent], instance: Consent, created: bool, **_kwargs: Any) -> None:
         def sync() -> None:
             metadata = {
                 "status": instance.status,
