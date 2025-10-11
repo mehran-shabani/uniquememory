@@ -103,13 +103,14 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     entry_id = entry_payload.get("entry_id") or entry_payload.get("id")
 
     requested_sensitivity = entry_payload.get("sensitivity")
-    if requested_sensitivity is not None and not isinstance(requested_sensitivity, str):
-        raise PermissionDenied("sensitivity must be a string.")
-
-    if requested_sensitivity is not None and requested_sensitivity not in {
-        choice for choice, _label in MemoryEntry.SENSITIVITY_CHOICES
-    }:
-        raise PermissionDenied("sensitivity must be one of the supported values.")
+    validated_sensitivity: str | None = None
+    if requested_sensitivity is not None:
+        if not isinstance(requested_sensitivity, str):
+            raise PermissionDenied("sensitivity must be a string.")
+        valid_sensitivities = {choice for choice, _label in MemoryEntry.SENSITIVITY_CHOICES}
+        if requested_sensitivity not in valid_sensitivities:
+            raise PermissionDenied("sensitivity must be one of the supported values.")
+        validated_sensitivity = requested_sensitivity
 
     entry_type = entry_payload.get("entry_type")
     if entry_type is not None and not isinstance(entry_type, str):
@@ -200,13 +201,8 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         elif "entry_type" in entry_payload:
             raise PermissionDenied("entry_type must be a valid string.")
 
-        if validated_entry_type is not None:
-            updates["entry_type"] = validated_entry_type
-
         for field, value in updates.items():
             setattr(entry, field, value)
-        if requested_sensitivity is not None:
-            entry.sensitivity = requested_sensitivity
 
         entry.version = expected_version + 1
         entry.save(update_fields=[*updates.keys(), "version", "updated_at"])

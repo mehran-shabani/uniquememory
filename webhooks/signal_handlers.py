@@ -10,19 +10,12 @@ from .services.dispatcher import dispatcher
 
 
 def _dispatch_event(*, event: str, data: dict[str, object]) -> None:
-    connection = transaction.get_connection()
+    """Schedule webhook delivery once the surrounding transaction commits."""
 
-    should_dispatch_immediately = (
-        connection.in_atomic_block
-        and "pytest" in sys.modules
-    )
+    def _send() -> None:
+        dispatcher.dispatch(event=event, data=data)
 
-    if should_dispatch_immediately:
-        dispatcher.dispatch(event=event, data=data)
-    else:
-        transaction.on_commit(lambda: dispatcher.dispatch(event=event, data=data))
-    else:
-        dispatcher.dispatch(event=event, data=data)
+    transaction.on_commit(_send)
 
 
 @receiver(memory_signals.entry_created)
