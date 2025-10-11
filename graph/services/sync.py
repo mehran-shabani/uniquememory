@@ -259,13 +259,8 @@ class GraphSyncService:
             source=consent_node, relation_type="permits_sensitivity"
         ).delete()
         GraphEdge.objects.filter(
-            target=consent_node, relation_type="permitted_by"
-        ).delete()
-
     def _on_commit(self, func: Callable[[], None]) -> None:
-        connection = transaction.get_connection()
-        if connection.in_atomic_block:
-            transaction.on_commit(func)
+        transaction.on_commit(func)
         else:
             func()
 
