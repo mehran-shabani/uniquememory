@@ -1,0 +1,62 @@
+name: "Bug report"
+description: "Report a defect that impacts the platform"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please provide as much detail as possible.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened? Provide a concise description of the bug.
+      placeholder: Briefly describe the issue
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: List the steps needed to reproduce the issue.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Include screenshots or logs if available.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Impact severity
+      options:
+        - Critical - service down or data loss
+        - High - major functionality broken
+        - Medium - degraded behavior
+        - Low - cosmetic or minor
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Provide environment information (branch, commit, browser, etc.).
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security considerations
+      options:
+        - label: This issue could impact security or privacy
+        - label: I have sanitized sensitive information from attachments

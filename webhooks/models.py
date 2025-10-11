@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import Iterable
 
-from django.db import models
+from django.db import connection, models
 from django.utils import timezone
 
 
@@ -12,6 +12,13 @@ class WebhookSubscriptionQuerySet(models.QuerySet):
         return self.filter(status=WebhookSubscription.STATUS_ACTIVE)
 
     def for_event(self, event_name: str) -> "WebhookSubscriptionQuerySet":
+        if connection.vendor == "sqlite":
+            matching_ids = [
+                pk
+                for pk, events in self.values_list("pk", "events")
+                if event_name in (events or [])
+            ]
+            return self.filter(pk__in=matching_ids)
         return self.filter(events__contains=[event_name])
 
 

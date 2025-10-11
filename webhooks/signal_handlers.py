@@ -9,8 +9,17 @@ from memory import signals as memory_signals
 from .services.dispatcher import dispatcher
 
 
+def _dispatch_event(*, event: str, data: dict[str, object]) -> None:
+    """Schedule webhook delivery once the surrounding transaction commits."""
+
+    def _send() -> None:
+        dispatcher.dispatch(event=event, data=data)
+
+    transaction.on_commit(_send)
+
+
 @receiver(memory_signals.entry_created)
-def handle_entry_created(sender, entry, **_kwargs):
+def handle_entry_created(_sender, entry, **_kwargs):
     data = {
         "entry_id": entry.pk,
         "title": entry.title,
@@ -18,16 +27,11 @@ def handle_entry_created(sender, entry, **_kwargs):
         "entry_type": entry.entry_type,
     }
 
-    transaction.on_commit(
-        lambda: dispatcher.dispatch(
-            event="memory.entry.created",
-            data=data,
-        )
-    )
+    _dispatch_event(event="memory.entry.created", data=data)
 
 
 @receiver(memory_signals.entry_updated)
-def handle_entry_updated(sender, entry, **_kwargs):
+def handle_entry_updated(_sender, entry, **_kwargs):
     data = {
         "entry_id": entry.pk,
         "title": entry.title,
@@ -35,30 +39,20 @@ def handle_entry_updated(sender, entry, **_kwargs):
         "entry_type": entry.entry_type,
     }
 
-    transaction.on_commit(
-        lambda: dispatcher.dispatch(
-            event="memory.entry.updated",
-            data=data,
-        )
-    )
+    _dispatch_event(event="memory.entry.updated", data=data)
 
 
 @receiver(memory_signals.entry_deleted)
-def handle_entry_deleted(sender, entry_id, **_kwargs):
+def handle_entry_deleted(_sender, entry_id, **_kwargs):
     data = {
         "entry_id": entry_id,
     }
 
-    transaction.on_commit(
-        lambda: dispatcher.dispatch(
-            event="memory.entry.deleted",
-            data=data,
-        )
-    )
+    _dispatch_event(event="memory.entry.deleted", data=data)
 
 
 @receiver(consent_signals.consent_created)
-def handle_consent_created(sender, consent, **_kwargs):
+def handle_consent_created(_sender, consent, **_kwargs):
     data = {
         "consent_id": consent.pk,
         "user_id": consent.user_id,
@@ -66,16 +60,11 @@ def handle_consent_created(sender, consent, **_kwargs):
         "status": consent.status,
     }
 
-    transaction.on_commit(
-        lambda: dispatcher.dispatch(
-            event="consent.created",
-            data=data,
-        )
-    )
+    _dispatch_event(event="consent.created", data=data)
 
 
 @receiver(consent_signals.consent_revoked)
-def handle_consent_revoked(sender, consent, **_kwargs):
+def handle_consent_revoked(_sender, consent, **_kwargs):
     data = {
         "consent_id": consent.pk,
         "user_id": consent.user_id,
@@ -84,9 +73,4 @@ def handle_consent_revoked(sender, consent, **_kwargs):
         "revoked_at": consent.revoked_at.isoformat() if consent.revoked_at else None,
     }
 
-    transaction.on_commit(
-        lambda: dispatcher.dispatch(
-            event="consent.revoked",
-            data=data,
-        )
-    )
+    _dispatch_event(event="consent.revoked", data=data)
