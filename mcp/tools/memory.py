@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Dict, List
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -91,28 +92,45 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
 
     return {"entry": _serialize_entry(entry)}
 
-        updates: dict[str, object] = {
-            key: value
-            for key, value in entry_payload.items()
-            if key in {"title", "content", "sensitivity", "entry_type"}
-        }
-        # نوع فیلدهای متنی رو تو آپدیت هم چک کنیم
-        if "title" in updates and not isinstance(updates["title"], str):
-            raise PermissionDenied("title must be a string.")
-        if "content" in updates and not isinstance(updates["content"], str):
-            raise PermissionDenied("content must be a string.")
+def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, object]:
+    entry_payload_obj = payload.get("entry") if isinstance(payload, dict) else None
+    if entry_payload_obj is None:
+        entry_payload_obj = payload
+    if not isinstance(entry_payload_obj, dict):
+        raise PermissionDenied("entry payload must be provided as an object.")
+
+    entry_payload: Dict[str, object] = entry_payload_obj
+    entry_id = entry_payload.get("entry_id") or entry_payload.get("id")
+
+    requested_sensitivity = entry_payload.get("sensitivity")
+    if requested_sensitivity is not None and not isinstance(requested_sensitivity, str):
+        raise PermissionDenied("sensitivity must be a string.")
+
+    entry_type = entry_payload.get("entry_type")
+    if entry_type is not None and not isinstance(entry_type, str):
+        raise PermissionDenied("entry_type must be a string.")
+
+    context = validator.parse(
+        bearer_token,
+        required_scopes=[SCOPE_MEMORY_WRITE],
+    )
+
     if entry_id is None:
         sensitivity = requested_sensitivity or MemoryEntry.SENSITIVITY_PUBLIC
-        validator.validate(
-            bearer_token,
+        validator.ensure_permissions(
+            context,
             action="memory:create",
-            required_scopes=[SCOPE_MEMORY_WRITE],
             sensitivity=sensitivity,
         )
+
         title = entry_payload.get("title")
         content = entry_payload.get("content")
         if not isinstance(title, str) or not isinstance(content, str):
             raise PermissionDenied("title and content must be provided for new entries.")
+
+        if entry_type is None:
+            entry_type = MemoryEntry.TYPE_NOTE
+
         entry = MemoryEntry.objects.create(
             title=title,
             content=content,
@@ -134,10 +152,9 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
         except MemoryEntry.DoesNotExist as exc:
             raise PermissionDenied("Memory entry not found.") from exc
 
-        context = validator.validate(
-            bearer_token,
+        validator.ensure_permissions(
+            context,
             action="memory:update",
-            required_scopes=[SCOPE_MEMORY_WRITE],
             sensitivity=entry.sensitivity,
         )
 
@@ -151,15 +168,21 @@ def memory_get(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str, ob
         if entry.version != expected_version:
             raise PermissionDenied("Version conflict detected.")
 
-        updates = {
+        updates: Dict[str, object] = {
             key: value
             for key, value in entry_payload.items()
             if key in {"title", "content", "sensitivity", "entry_type"}
         }
+
+        for field in ("title", "content", "sensitivity", "entry_type"):
+            if field in updates and not isinstance(updates[field], str):
+                raise PermissionDenied(f"{field} must be a string.")
+
         for field, value in updates.items():
             setattr(entry, field, value)
         entry.version = expected_version + 1
         entry.save(update_fields=[*updates.keys(), "version", "updated_at"])
+
     return {"entry_id": entry.pk, "version": entry.version}
 
 
