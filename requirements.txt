@@ -1,0 +1,6 @@
+Django==5.2.7
+djangorestframework>=3.15,<4.0
+djangorestframework-simplejwt>=5.3,<6.0
+sentence-transformers>=3.0.0
+requests>=2.31,<3.0
+numpy>=1.26,<3.0
