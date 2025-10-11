@@ -15,7 +15,7 @@ class WebhookSubscriptionQuerySet(models.QuerySet):
         if connection.vendor == "sqlite":
             matching_ids = [
                 subscription.pk
-                for subscription in self.all()
+                for subscription in self
                 if event_name in (subscription.events or [])
             ]
             if not matching_ids:

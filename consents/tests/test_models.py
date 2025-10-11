@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-import pytest
 
 from consents.models import Consent, SCOPE_MEMORY_READ, SCOPE_MEMORY_WRITE
 from memory.models import MemoryEntry
@@ -14,15 +16,15 @@ class TestConsentModel:
         self.user = get_user_model().objects.create_user("owner@example.com", "password")
         self.agent_identifier = "agent-z"
 
-    def _create_valid_consent(self, **overrides):
-        data = dict(
+    def _create_valid_consent(self, **overrides: Any) -> Consent:
+        data: dict[str, Any] = {
             user=self.user,
             agent_identifier=self.agent_identifier,
             scopes=[SCOPE_MEMORY_READ],
             sensitivity_levels=[MemoryEntry.SENSITIVITY_PUBLIC],
             status=Consent.STATUS_PENDING,
             version=1,
-        )
+        }
         data.update(overrides)
         return Consent.objects.create(**data)
 
