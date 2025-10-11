@@ -75,7 +75,7 @@ class GraphSyncService:
 
         self._on_commit(sync)
 
-    def _handle_memory_entry_deleted(self, sender, instance: MemoryEntry, **_kwargs: Any) -> None:
+    def _handle_memory_entry_deleted(self, sender: type[MemoryEntry], instance: MemoryEntry, **_kwargs: Any) -> None:
         def sync() -> None:
             GraphNode.objects.filter(
                 node_type=self.memory_node_type,
