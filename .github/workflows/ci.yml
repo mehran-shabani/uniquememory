@@ -45,21 +45,25 @@ jobs:
 
       - name: Build coverage artifacts
         if: always()
+        id: coverage
         run: |
           if [ -f .coverage ]; then
             coverage xml
             coverage html
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "generated=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Verify Python files compile
         run: python -m compileall .
 
       - name: Upload coverage reports
-        if: always() && hashFiles('coverage.xml') != ''
+        if: steps.coverage.outputs.generated == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python-version }}
           path: |
             coverage.xml
             htmlcov
-          if-no-files-found: error
+          if-no-files-found: warn

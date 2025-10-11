@@ -106,9 +106,23 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     if requested_sensitivity is not None and not isinstance(requested_sensitivity, str):
         raise PermissionDenied("sensitivity must be a string.")
 
+    validated_sensitivity: str | None = None
+    if requested_sensitivity is not None:
+        allowed_sensitivities = {choice for choice, _ in MemoryEntry.SENSITIVITY_CHOICES}
+        if requested_sensitivity not in allowed_sensitivities:
+            raise PermissionDenied("sensitivity is invalid.")
+        validated_sensitivity = requested_sensitivity
+
     entry_type = entry_payload.get("entry_type")
     if entry_type is not None and not isinstance(entry_type, str):
         raise PermissionDenied("entry_type must be a string.")
+
+    validated_entry_type: str | None = None
+    if entry_type is not None:
+        allowed_entry_types = {choice for choice, _ in MemoryEntry.TYPE_CHOICES}
+        if entry_type not in allowed_entry_types:
+            raise PermissionDenied("entry_type is invalid.")
+        validated_entry_type = entry_type
 
     context = validator.parse(
         bearer_token,
@@ -116,7 +130,7 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
     )
 
     if entry_id is None:
-        sensitivity = requested_sensitivity or MemoryEntry.SENSITIVITY_PUBLIC
+        sensitivity = validated_sensitivity or MemoryEntry.SENSITIVITY_PUBLIC
         validator.ensure_permissions(
             context,
             action="memory:create",
@@ -127,9 +141,6 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
         content = entry_payload.get("content")
         if not isinstance(title, str) or not isinstance(content, str):
             raise PermissionDenied("title and content must be provided for new entries.")
-
-        if entry_type is None:
-            entry_type = MemoryEntry.TYPE_NOTE
 
         entry = MemoryEntry.objects.create(
             title=title,
@@ -158,32 +169,41 @@ def memory_upsert(*, bearer_token: str, payload: Dict[str, object]) -> Dict[str,
             sensitivity=entry.sensitivity,
         )
 
-        if requested_sensitivity and requested_sensitivity != entry.sensitivity:
+        if validated_sensitivity and validated_sensitivity != entry.sensitivity:
             validator.ensure_permissions(
                 context,
                 action="memory:update",
-                sensitivity=requested_sensitivity,
+                sensitivity=validated_sensitivity,
             )
 
         if entry.version != expected_version:
             raise PermissionDenied("Version conflict detected.")
+        updates: Dict[str, object] = {}
 
-        updates: Dict[str, object] = {
-            key: value
-            for key, value in entry_payload.items()
-            if key in {"title", "content", "sensitivity", "entry_type"}
-        }
+        if "title" in entry_payload:
+            title = entry_payload["title"]
+            if not isinstance(title, str):
+                raise PermissionDenied("title must be a string.")
+            updates["title"] = title
 
-        for field in ("title", "content", "sensitivity", "entry_type"):
-            if field in updates and not isinstance(updates[field], str):
-                raise PermissionDenied(f"{field} must be a string.")
+        if "content" in entry_payload:
+            content = entry_payload["content"]
+            if not isinstance(content, str):
+                raise PermissionDenied("content must be a string.")
+            updates["content"] = content
+
+        if validated_sensitivity is not None:
+            updates["sensitivity"] = validated_sensitivity
+        elif "sensitivity" in entry_payload:
+            raise PermissionDenied("sensitivity must be a valid string.")
+
+        if validated_entry_type is not None:
+            updates["entry_type"] = validated_entry_type
+        elif "entry_type" in entry_payload:
+            raise PermissionDenied("entry_type must be a valid string.")
 
         for field, value in updates.items():
             setattr(entry, field, value)
-        if requested_sensitivity is not None:
-            entry.sensitivity = requested_sensitivity
-        if validated_entry_type is not None:
-            entry.entry_type = validated_entry_type
 
         entry.version = expected_version + 1
         entry.save(update_fields=[*updates.keys(), "version", "updated_at"])

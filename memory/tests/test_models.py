@@ -41,7 +41,7 @@ class TestMemoryModels:
         assert job.started_at is not None
         assert job.attempts == 1
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Only pending or failed jobs can be started"):
             job.start()
 
         job.complete("summary")
@@ -49,7 +49,7 @@ class TestMemoryModels:
         assert job.summary == "summary"
         assert job.completed_at is not None
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Only processing jobs can fail"):
             job.fail("error")
 
         job.status = MemoryCondensationJob.STATUS_FAILED
