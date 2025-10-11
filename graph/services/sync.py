@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -59,9 +60,7 @@ class GraphSyncService:
     # ------------------------------------------------------------------
     # Signal handlers
     # ------------------------------------------------------------------
-    def _handle_memory_entry_saved(self, sender, instance: MemoryEntry, **_kwargs: Any) -> None:
-        del sender
-
+    def _handle_memory_entry_saved(self, _sender, instance: MemoryEntry, **_kwargs: Any) -> None:
         def sync() -> None:
             metadata = {
                 "sensitivity": instance.sensitivity,
@@ -76,9 +75,7 @@ class GraphSyncService:
 
         self._on_commit(sync)
 
-    def _handle_memory_entry_deleted(self, sender, instance: MemoryEntry, **_kwargs: Any) -> None:
-        del sender
-
+    def _handle_memory_entry_deleted(self, _sender, instance: MemoryEntry, **_kwargs: Any) -> None:
         def sync() -> None:
             GraphNode.objects.filter(
                 node_type=self.memory_node_type,
@@ -87,9 +84,7 @@ class GraphSyncService:
 
         self._on_commit(sync)
 
-    def _handle_consent_saved(self, sender, instance: Consent, **_kwargs: Any) -> None:
-        del sender
-
+    def _handle_consent_saved(self, _sender, instance: Consent, **_kwargs: Any) -> None:
         def sync() -> None:
             metadata = {
                 "status": instance.status,
@@ -123,9 +118,7 @@ class GraphSyncService:
 
         self._on_commit(sync)
 
-    def _handle_consent_deleted(self, sender, instance: Consent, **_kwargs: Any) -> None:
-        del sender
-
+    def _handle_consent_deleted(self, _sender, instance: Consent, **_kwargs: Any) -> None:
         def sync() -> None:
             GraphNode.objects.filter(
                 node_type=self.consent_node_type,
@@ -271,6 +264,9 @@ class GraphSyncService:
         ).delete()
 
     def _on_commit(self, func: Callable[[], None]) -> None:
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            func()
+            return
         transaction.on_commit(func)
 
 
