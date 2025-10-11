@@ -17,7 +17,6 @@ class TestConsentModel:
         self.agent_identifier = "agent-z"
 
     def _create_valid_consent(self, **overrides: Any) -> Consent:
-    def _create_valid_consent(self, **overrides: Any) -> Consent:
         data: dict[str, Any] = {
             "user": self.user,
             "agent_identifier": self.agent_identifier,
@@ -26,8 +25,6 @@ class TestConsentModel:
             "status": Consent.STATUS_PENDING,
             "version": 1,
         }
-        data.update(overrides)
-        return Consent.objects.create(**data)
         data.update(overrides)
         return Consent.objects.create(**data)
 
