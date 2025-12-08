@@ -11,7 +11,7 @@ authors = [{ name = "Unique Memory", email = "dev@uniquememory.local" }]
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 dependencies = [
-    "Django==5.2.7",
+    "Django==5.2.9",
     "djangorestframework>=3.15,<4.0",
     "djangorestframework-simplejwt>=5.3,<6.0",
     "sentence-transformers>=3.0.0",
